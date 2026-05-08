@@ -22,6 +22,31 @@ import imageio_ffmpeg
 
 from config import VIDEO_WIDTH, VIDEO_HEIGHT, VIDEO_FPS, SCENE_KEYWORDS
 
+# ── GPU detection ─────────────────────────────────────────────────────────────
+
+def _detect_nvenc() -> bool:
+    """Returns True if ffmpeg has h264_nvenc support (NVIDIA GPU available)."""
+    try:
+        ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+        result = subprocess.run(
+            [ffmpeg, "-hide_banner", "-encoders"],
+            capture_output=True, text=True, timeout=10,
+        )
+        return "h264_nvenc" in result.stdout
+    except Exception:
+        return False
+
+_USE_NVENC = _detect_nvenc()
+if _USE_NVENC:
+    print("[render] GPU detected — using h264_nvenc (NVIDIA accelerated)")
+else:
+    print("[render] CPU encoding — using libx264")
+
+def _encode_args(crf: int = 22, cq: int = 23) -> list:
+    if _USE_NVENC:
+        return ["-c:v", "h264_nvenc", "-preset", "p4", "-cq", str(cq), "-b:v", "0"]
+    return ["-c:v", "libx264", "-preset", "fast", "-crf", str(crf)]
+
 # ── Pexels helpers ────────────────────────────────────────────────────────────
 
 def _pexels_search(keyword: str, per_page: int = 10) -> list:
@@ -120,11 +145,10 @@ def _download_and_process_clip(
         ffmpeg, "-y", "-i", raw,
         "-t", str(clip_len),
         "-vf", (
-            f"scale={VIDEO_WIDTH}:{VIDEO_HEIGHT}:force_original_aspect_ratio=increase,"
+            f"scale={int(VIDEO_WIDTH*1.04)}:{int(VIDEO_HEIGHT*1.04)}:force_original_aspect_ratio=increase,"
             f"crop={VIDEO_WIDTH}:{VIDEO_HEIGHT},fps={VIDEO_FPS}"
         ),
-        "-c:v", "libx264", "-preset", "fast", "-crf", "23",
-        "-an", "-pix_fmt", "yuv420p",
+        *_encode_args(), "-an", "-pix_fmt", "yuv420p",
         proc,
     ]
     result = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
@@ -226,9 +250,27 @@ def _ass_time(sec: float) -> str:
 def write_ass_subtitles(captions: list, segments: list, ass_path: str) -> str:
     """
     Generate an ASS subtitle file with:
-      • Karaoke-style white bold captions (bottom center)
+      • Fade-in/out karaoke-style captions, speaker-color-coded
       • Speaker lower-third labels (top left, semi-transparent box)
     """
+    # ASS color format: &HAABBGGRR (alpha, blue, green, red)
+    SPEAKER_COLORS = {
+        "NARRATOR":     "&H00FFFFFF",   # white
+        "OP":           "&H0000DCFF",   # gold/yellow
+        "OP_MALE":      "&H0000DCFF",   # gold/yellow
+        "CHARACTER_F":  "&H00C896FF",   # pink
+        "CHARACTER_M":  "&H0064C8FF",   # light orange
+        "CHARACTER_F2": "&H00FFAACC",   # lavender
+        "CHARACTER_M2": "&H00FFD080",   # sky blue
+    }
+
+    # Build caption→speaker lookup: each caption maps to its segment by time overlap
+    def _find_speaker(cap_start: float) -> str:
+        for seg in segments:
+            if seg["start"] <= cap_start < seg["start"] + seg["duration"] + 0.1:
+                return seg.get("speaker", "NARRATOR")
+        return "NARRATOR"
+
     header = (
         "[Script Info]\n"
         "ScriptType: v4.00+\n"
@@ -240,9 +282,9 @@ def write_ass_subtitles(captions: list, segments: list, ass_path: str) -> str:
         "OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, "
         "ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
         "Alignment, MarginL, MarginR, MarginV, Encoding\n"
-        # Caption style — large bold white text, black outline, bottom-center
+        # Caption style — large bold, black outline, bottom-center
         "Style: Caption,Arial Black,68,&H00FFFFFF,&H000000FF,"
-        "&H00000000,&H80000000,-1,0,0,0,100,100,1,0,1,4,2,2,60,60,100,1\n"
+        "&H00000000,&H90000000,-1,0,0,0,100,100,1,0,1,4,2,2,60,60,100,1\n"
         # Label style — smaller, top-left, opaque dark box
         "Style: Label,Arial,42,&H00FFFFFF,&H000000FF,"
         "&H00111111,&HCC000000,-1,0,0,0,100,100,1,0,3,2,1,1,40,40,40,1\n\n"
@@ -260,12 +302,16 @@ def write_ass_subtitles(captions: list, segments: list, ass_path: str) -> str:
             end   = _ass_time(seg["start"] + seg["duration"])
             f.write(f"Dialogue: 0,{start},{end},Label,,0,0,0,,{label}\n")
 
-        # Caption lines (layer 1)
+        # Caption lines (layer 1) — colored + fade animated
         for cap in captions:
-            text  = cap["text"].replace("{", "").replace("}", "").replace("\n", " ")
-            start = _ass_time(cap["start"])
-            end   = _ass_time(cap["end"])
-            f.write(f"Dialogue: 1,{start},{end},Caption,,0,0,0,,{text}\n")
+            text    = cap["text"].replace("{", "").replace("}", "").replace("\n", " ")
+            start   = _ass_time(cap["start"])
+            end     = _ass_time(cap["end"])
+            speaker = _find_speaker(cap["start"])
+            color   = SPEAKER_COLORS.get(speaker, "&H00FFFFFF")
+            # {\fad(in_ms,out_ms)} fade + {\c&Hcolor&} speaker color
+            styled  = f"{{\\fad(180,120)\\c{color}}}{text}"
+            f.write(f"Dialogue: 1,{start},{end},Caption,,0,0,0,,{styled}\n")
 
     return ass_path
 
@@ -346,7 +392,7 @@ def render_drama_video(
             "-filter_complex",
             f"[0:v]ass={ass_escaped}[v];{audio_filter}",
             "-map", "[v]", "-map", "[aout]",
-            "-c:v", "libx264", "-preset", "fast", "-crf", "20",
+            *_encode_args(), "-pix_fmt", "yuv420p",
             "-c:a", "aac", "-b:a", "192k",
             "-movflags", "+faststart",
             "-t", str(audio_duration),
@@ -359,7 +405,7 @@ def render_drama_video(
             "-i", audio_path,
             "-filter_complex", f"[0:v]ass={ass_escaped}[v]",
             "-map", "[v]", "-map", "1:a",
-            "-c:v", "libx264", "-preset", "fast", "-crf", "20",
+            *_encode_args(), "-pix_fmt", "yuv420p",
             "-c:a", "aac", "-b:a", "192k",
             "-movflags", "+faststart",
             "-t", str(audio_duration),

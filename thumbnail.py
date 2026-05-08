@@ -1,4 +1,5 @@
 import os
+import math
 import textwrap
 from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
 
@@ -21,6 +22,9 @@ def generate_thumbnail(title: str, output_path: str,
     draw = ImageDraw.Draw(bg)
     _draw_top_badge(draw, width)
     _draw_main_title(draw, title, width, height)
+    _draw_red_highlight_circle(draw, width, height)
+    _draw_attention_arrows(draw, width, height)
+    _draw_shock_starburst(draw, width, height)
     _draw_bottom_bar(draw, width, height)
     _draw_border(draw, width, height)
     bg.save(output_path, "PNG", quality=95)
@@ -106,3 +110,49 @@ def _draw_border(draw, width, height):
     draw.rectangle([0, height-b, width, height], fill=(255,0,0))
     draw.rectangle([0, 0, b, height], fill=(255,0,0))
     draw.rectangle([width-b, 0, width, height], fill=(255,0,0))
+
+
+def _draw_red_highlight_circle(draw, width, height):
+    """Jagged red circle around the title area — draws attention like a real highlight."""
+    cx, cy = width // 2, height // 2 - 15
+    rx, ry = width // 3 + 20, 145
+    # Draw a rough ellipse with thick red stroke
+    draw.ellipse((cx - rx, cy - ry, cx + rx, cy + ry), outline=(255, 15, 15), width=9)
+    # Second slightly offset for hand-drawn feel
+    draw.ellipse((cx - rx + 4, cy - ry - 4, cx + rx - 4, cy + ry + 4), outline=(220, 0, 0), width=4)
+
+
+def _draw_attention_arrows(draw, width, height):
+    """Two bold red arrows pointing inward to the title from left and right."""
+    # Left arrow (pointing right →)
+    lx, ly = 55, height // 2 - 15
+    shaft = [(lx, ly - 10), (lx + 60, ly - 10), (lx + 60, ly + 10), (lx, ly + 10)]
+    head  = [(lx + 55, ly - 28), (lx + 95, ly), (lx + 55, ly + 28)]
+    draw.polygon(shaft, fill=(255, 20, 20))
+    draw.polygon(head,  fill=(255, 20, 20))
+
+    # Right arrow (pointing left ←)
+    rx2, ry2 = width - 55, height // 2 - 15
+    shaft2 = [(rx2, ry2 - 10), (rx2 - 60, ry2 - 10), (rx2 - 60, ry2 + 10), (rx2, ry2 + 10)]
+    head2  = [(rx2 - 55, ry2 - 28), (rx2 - 95, ry2), (rx2 - 55, ry2 + 28)]
+    draw.polygon(shaft2, fill=(255, 20, 20))
+    draw.polygon(head2,  fill=(255, 20, 20))
+
+
+def _draw_shock_starburst(draw, width, height):
+    """Starburst badge in top-right with shock text."""
+    cx, cy = width - 120, 155
+    r_outer, r_inner = 88, 55
+    spikes = 12
+    points = []
+    for i in range(spikes * 2):
+        angle = math.pi * i / spikes - math.pi / 2
+        r = r_outer if i % 2 == 0 else r_inner
+        points.append((cx + r * math.cos(angle), cy + r * math.sin(angle)))
+    draw.polygon(points, fill=(220, 0, 0))
+    # Inner circle for text
+    draw.ellipse((cx - 50, cy - 50, cx + 50, cy + 50), fill=(180, 0, 0))
+    font_big = _font("arialbd.ttf", 28)
+    font_sm  = _font("arialbd.ttf", 20)
+    draw.text((cx, cy - 14), "NO", fill="white", font=font_big, anchor="mm")
+    draw.text((cx, cy + 14), "WAY!", fill="white", font=font_sm, anchor="mm")

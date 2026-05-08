@@ -68,14 +68,21 @@ def _extract_scene_tags(script: str) -> list[str]:
 # ── Title & description ───────────────────────────────────────────────────────
 
 _TITLE_PATTERNS = [
-    'She Did WHAT?! | {seed}',
-    'Am I Wrong? | {seed}',
-    'This Changed Everything | {seed}',
+    'She Did WHAT?! 😱 {seed}',
+    'AITA: {seed} | Reddit Drama',
+    'I Can\'t Believe This Actually Happened… {seed}',
     'Nobody Saw This Coming | {seed}',
-    'Reddit Drama: {seed}',
-    'AITA: {seed}',
-    'I Can\'t Believe This Happened | {seed}',
-    'The Truth Finally Came Out | {seed}',
+    'The Truth Finally Came Out 😤 | {seed}',
+    '{seed}… and I\'m Still Not Over It',
+    'Reddit AITA: {seed} (Full Story)',
+    'She REALLY Did That 😭 | {seed}',
+    'This Destroyed Our Whole Family | {seed}',
+    'EXPOSING The Truth | {seed}',
+    'I\'m Done Being Silent | {seed}',
+    'Wait Until You Hear This 😳 | {seed}',
+    'They Thought I\'d Never Find Out… | {seed}',
+    'The Audacity 😤 | {seed} | AITA',
+    'AITA For {seed}? You Decide.',
 ]
 
 
@@ -93,14 +100,24 @@ def _make_description(story_seed: str, title: str) -> str:
     tags = " ".join([
         "#AITA", "#RedditDrama", "#DramaDesk", "#RelationshipAdvice",
         "#FamilyDrama", "#Reddit", "#StoryTime", "#AmITheAsshole",
-        "#Relationships", "#TrueStory", "#EntitledPeople",
+        "#Relationships", "#TrueStory", "#EntitledPeople", "#RedditStories",
+        "#AITAReddit", "#DramaChannel", "#DailyDrama", "#RedditReading",
     ])
     return (
         f"{title}\n\n"
-        f"Today on Drama Desk we're diving into a story that has everyone divided.\n\n"
+        f"Today on Drama Desk, we're diving into a story that has EVERYONE divided:\n"
         f'"{story_seed}"\n\n'
-        f"What do YOU think? Let us know in the comments!\n\n"
-        f"Subscribe for daily drama: @DramaDeskChannel\n\n"
+        f"Drop a ❤️ if you're on OP's side. Drop a 💀 if you think they went too far.\n"
+        f"Comment your verdict — I read every single one.\n\n"
+        f"⏱️ CHAPTERS\n"
+        f"0:00 The Most Shocking Part First\n"
+        f"0:30 The Full Story Begins\n"
+        f"2:00 Things Start Going Wrong\n"
+        f"3:30 The Big Confrontation\n"
+        f"5:00 The Aftermath\n"
+        f"6:00 Who's Really in the Wrong?\n\n"
+        f"🔔 NEW drama story every single day — Subscribe so you never miss one!\n"
+        f"👇 @DramaDeskChannel\n\n"
         f"{tags}"
     )
 
@@ -108,12 +125,44 @@ def _make_description(story_seed: str, title: str) -> str:
 # ── Music finder ──────────────────────────────────────────────────────────────
 
 def _find_music() -> str | None:
+    import requests as _requests
     music_dir = os.path.join(os.path.dirname(__file__), "music")
-    if not os.path.isdir(music_dir):
-        return None
+    os.makedirs(music_dir, exist_ok=True)
+    # Return cached track if present
     for f in os.listdir(music_dir):
         if f.lower().endswith((".mp3", ".wav", ".ogg", ".m4a", ".flac")):
             return os.path.join(music_dir, f)
+    # Auto-download a dramatic background track from Pixabay Audio
+    api_key = os.getenv("PIXABAY_API_KEY", "")
+    if not api_key:
+        print("[music] No PIXABAY_API_KEY — add a drama track to music/ manually")
+        return None
+    queries = ["dramatic cinematic", "tension thriller", "emotional piano strings", "suspense background"]
+    for q in queries:
+        try:
+            resp = _requests.get(
+                "https://pixabay.com/api/",
+                params={"key": api_key, "q": q, "media_type": "music", "per_page": 10},
+                timeout=15,
+            )
+            if resp.status_code != 200:
+                continue
+            hits = resp.json().get("hits", [])
+            random.shuffle(hits)
+            for hit in hits:
+                url = hit.get("previewURL", "")
+                if not url:
+                    continue
+                track_path = os.path.join(music_dir, f"drama_bg_{q.split()[0]}.mp3")
+                r = _requests.get(url, timeout=30)
+                if r.status_code == 200 and len(r.content) > 10_000:
+                    with open(track_path, "wb") as f_out:
+                        f_out.write(r.content)
+                    print(f"[music] Downloaded: {os.path.basename(track_path)}")
+                    return track_path
+        except Exception as e:
+            print(f"[music] Auto-download failed for '{q}': {e}")
+    print("[music] No background music found — add an MP3 to music/ folder")
     return None
 
 
