@@ -67,33 +67,96 @@ def _extract_scene_tags(script: str) -> list[str]:
 
 # ── Title & description ───────────────────────────────────────────────────────
 
-_TITLE_PATTERNS = [
-    'She Did WHAT?! 😱 {seed}',
-    'AITA: {seed} | Reddit Drama',
-    'I Can\'t Believe This Actually Happened… {seed}',
-    'Nobody Saw This Coming | {seed}',
-    'The Truth Finally Came Out 😤 | {seed}',
-    '{seed}… and I\'m Still Not Over It',
-    'Reddit AITA: {seed} (Full Story)',
-    'She REALLY Did That 😭 | {seed}',
-    'This Destroyed Our Whole Family | {seed}',
-    'EXPOSING The Truth | {seed}',
-    'I\'m Done Being Silent | {seed}',
-    'Wait Until You Hear This 😳 | {seed}',
-    'They Thought I\'d Never Find Out… | {seed}',
-    'The Audacity 😤 | {seed} | AITA',
-    'AITA For {seed}? You Decide.',
+# Keyword-matched punchy title pools — no raw seed text dumped in.
+# Top AITA channels use short emotional hooks, not full sentences.
+_TITLE_POOLS = [
+    # (keywords, [title variants])
+    (["wedding", "venue", "bride", "ceremony", "tacky"], [
+        "She Called My Sister's Wedding TACKY and Now the Family is DONE With Her 😱",
+        "I Said ONE Thing About the Wedding and Destroyed the Whole Family | AITA",
+        "Was I Wrong to Call Her Wedding Choice Embarrassing? | Reddit Drama",
+        "She Ruined the Wedding With ONE Sentence and I'm Still Not Over It | AITA",
+    ]),
+    (["cheating", "affair", "cheated"], [
+        "I Found Out She Was Cheating and I'm Not Sorry 😤 | Reddit Drama AITA",
+        "He Thought I'd Never Find Out… He Was Wrong | Reddit AITA Drama",
+        "She Was Cheating the Whole Time and Nobody Saw This Coming 😱 | AITA",
+    ]),
+    (["divorce", "separated"], [
+        "The Divorce No One Saw Coming — And I'm Still Not Over It | AITA Drama",
+        "My Marriage Ended Over This and EVERYONE Has an Opinion 😤 | Reddit AITA",
+    ]),
+    (["fired", "quit", "boss", "workplace"], [
+        "I Quit My Job in Front of EVERYONE and Never Looked Back 😤 | AITA",
+        "My Boss Pushed Me Too Far… So I Did This | Reddit Drama AITA",
+        "I Said What Nobody Else Would Say at Work and the Drama Was UNREAL | AITA",
+    ]),
+    (["mother-in-law", "mil"], [
+        "My Mother-In-Law CROSSED the Line and I Finally Snapped | Reddit AITA",
+        "She Went Too Far and I'm DONE Being Silent | Reddit Drama AITA",
+    ]),
+    (["mom", "mother", "stepmom"], [
+        "My Own Mom BETRAYED Me and the Family is SPLIT | Reddit AITA Drama",
+        "She's My Mom and She Still Did THIS — Am I Wrong for Cutting Her Off? | AITA",
+    ]),
+    (["sister"], [
+        "My Sister Did the Unthinkable and the Whole Family Chose Sides | AITA",
+        "She's My Sister and She STILL Did That 😱 | Reddit Drama AITA",
+        "My Sister Crossed a Line I Can't Come Back From | Reddit AITA",
+    ]),
+    (["brother"], [
+        "My Brother Crossed the Line and I Finally Said Enough | Reddit AITA",
+        "He's My Brother and He STILL Did This — Who's Wrong Here? | AITA Drama",
+    ]),
+    (["boyfriend", "girlfriend", "ex", "dating"], [
+        "My Ex Thought I'd Stay Silent… They Were WRONG 😤 | Reddit Drama AITA",
+        "She Did This Behind My Back and NOBODY Saw It Coming 😱 | AITA",
+        "I Found Out the Truth About My Partner and Everything Changed | AITA Drama",
+    ]),
+    (["husband"], [
+        "My Husband's Secret Came Out and Changed EVERYTHING | Reddit AITA Drama",
+        "He Thought I Didn't Know… But I Knew Everything 😤 | Reddit Drama",
+    ]),
+    (["wife"], [
+        "She Hid This From Me for YEARS and I Finally Found Out 😱 | AITA Drama",
+        "My Wife Did This Behind My Back and I'm Still Not Over It | Reddit AITA",
+    ]),
+    (["money", "cash", "stole", "loan", "debt"], [
+        "She Took Everything and Thought I'd Stay Silent — She Was Wrong 😤 | AITA",
+        "I Did the Math and Finally SNAPPED | Reddit Drama AITA",
+    ]),
+    (["party", "invite", "birthday", "christmas"], [
+        "They Left Me Out and Then Had the Nerve to Be Upset | Reddit AITA",
+        "I Wasn't Invited and I Made Sure They Knew It 😤 | AITA Drama",
+    ]),
+    (["secret", "lied", "hiding", "truth"], [
+        "The Truth Finally Came Out and NOBODY Was Ready For It 😱 | Reddit AITA",
+        "She Was Hiding This the Whole Time and I Am FLOORED | AITA Drama",
+    ]),
+    (["family"], [
+        "This Family Drama Has EVERYONE Divided and I Need YOUR Verdict | AITA",
+        "My Whole Family is Against Me — But Was I Really Wrong? | Reddit AITA",
+    ]),
+]
+
+# Generic pool used when no keyword matches
+_GENERIC_TITLES = [
+    "Nobody Saw This Coming 😱 and I'm Still Processing It | Reddit AITA Drama",
+    "I Said What I Said and I'm Not Sorry 😤 | Reddit Drama AITA",
+    "The Truth Came Out and EVERYTHING Changed — Who's Wrong Here? | AITA",
+    "They Thought I'd Stay Silent… They Were WRONG | Reddit Drama AITA",
+    "This Drama Has EVERYONE Divided and I Need Your Verdict | AITA Drama",
+    "I Did the Thing Nobody Expected and Now the Family is SPLIT | AITA",
+    "She Crossed a Line I Can't Come Back From 😤 | Reddit AITA Drama",
 ]
 
 
 def _make_title(story_seed: str) -> str:
-    seed = story_seed.strip().rstrip("?").strip()
-    # Cap seed at 65 chars for title length
-    if len(seed) > 65:
-        seed = seed[:62] + "..."
-    pattern = random.choice(_TITLE_PATTERNS)
-    title = pattern.format(seed=seed)
-    return title[:100]   # YouTube title limit
+    s = story_seed.lower()
+    for keywords, pool in _TITLE_POOLS:
+        if any(k in s for k in keywords):
+            return random.choice(pool)
+    return random.choice(_GENERIC_TITLES)
 
 
 def _make_description(story_seed: str, title: str) -> str:
@@ -132,10 +195,50 @@ def _find_music() -> str | None:
     for f in os.listdir(music_dir):
         if f.lower().endswith((".mp3", ".wav", ".ogg", ".m4a", ".flac")):
             return os.path.join(music_dir, f)
-    # Auto-download a dramatic background track from Pixabay Audio
+    # ── 1. Try Jamendo (best free music API — cinematic/dramatic tracks) ────────
+    jamendo_id = os.getenv("JAMENDO_CLIENT_ID", "")
+    if jamendo_id:
+        for tags in ["cinematic dramatic", "tension thriller", "emotional piano", "suspense ambient", "dramatic orchestral"]:
+            try:
+                resp = _requests.get(
+                    "https://api.jamendo.com/v3.0/tracks/",
+                    params={
+                        "client_id": jamendo_id,
+                        "format": "json",
+                        "limit": 20,
+                        "tags": tags,
+                        "audioformat": "mp32",
+                        "audiodlformat": "mp32",
+                    },
+                    timeout=15,
+                )
+                if resp.status_code != 200:
+                    continue
+                tracks = resp.json().get("results", [])
+                tracks = [t for t in tracks if t.get("audiodownload_allowed") and t.get("audiodownload")]
+                if not tracks:
+                    continue
+                track = random.choice(tracks[:10])
+                track_path = os.path.join(music_dir, f"jamendo_{track['id']}.mp3")
+                r = _requests.get(track["audiodownload"], timeout=60, stream=True)
+                if r.status_code == 200:
+                    with open(track_path, "wb") as f_out:
+                        for chunk in r.iter_content(chunk_size=65536):
+                            f_out.write(chunk)
+                    if os.path.getsize(track_path) > 50_000:
+                        print(f"[music] Jamendo: '{track.get('name', tags)}' by {track.get('artist_name', '?')}")
+                        return track_path
+                    os.remove(track_path)   # too small, bad download
+            except Exception as e:
+                print(f"[music] Jamendo failed for '{tags}': {e}")
+                continue
+    else:
+        print("[music] No JAMENDO_CLIENT_ID — get a free key at devportal.jamendo.com")
+
+    # ── 2. Fallback: Pixabay Audio ────────────────────────────────────────────
     api_key = os.getenv("PIXABAY_API_KEY", "")
     if not api_key:
-        print("[music] No PIXABAY_API_KEY — add a drama track to music/ manually")
+        print("[music] No music found — drop an MP3 into the music/ folder")
         return None
     queries = ["dramatic cinematic", "tension thriller", "emotional piano strings", "suspense background"]
     for q in queries:
@@ -299,7 +402,11 @@ async def create_drama_video(
     print("\n[5/6] Generating thumbnail...")
     title = _make_title(story_seed)
     thumb_path = os.path.join(output_dir, "thumbnail.png")
-    generate_thumbnail(title, thumb_path, video_path, style="drama")
+    generate_thumbnail(
+        title, thumb_path, video_path, style="drama",
+        story_seed=story_seed,
+        pexels_key=os.getenv("PEXELS_API_KEY"),
+    )
 
     # ── 6. Upload ─────────────────────────────────────────────────────────────
     url = None
