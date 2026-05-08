@@ -42,10 +42,17 @@ jobs:
           cache: pip
 
       # ── 3. System deps ───────────────────────────────────────────────────────
-      - name: Install ffmpeg
+      - name: Install system dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y ffmpeg libfontconfig1
+          sudo apt-get install -y ffmpeg libfontconfig1 espeak-ng
+
+      # ── 3b. Cache Kokoro model weights (~115 MB total, avoid re-downloading daily) ─
+      - name: Cache Kokoro model
+        uses: actions/cache@v4
+        with:
+          path: models/
+          key: kokoro-82m-v1
 
       # ── 4. Python deps ───────────────────────────────────────────────────────
       - name: Install Python dependencies

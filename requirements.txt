@@ -3,8 +3,9 @@ python-dotenv
 requests
 moviepy
 
-# TTS — multi-voice drama narration
-edge-tts
+# TTS — Kokoro-82M (open-weight, emotional voices, GPU/CPU)
+kokoro-onnx
+soundfile
 
 # Video processing
 imageio

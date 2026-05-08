@@ -16,7 +16,6 @@ Run manually:
 """
 
 import os
-import asyncio
 import json
 import random
 import re
@@ -351,7 +350,7 @@ def _upload_youtube(video_path: str, title: str, description: str) -> str | None
 
 # ── Main pipeline ─────────────────────────────────────────────────────────────
 
-async def create_drama_video(
+def create_drama_video(
     story_seed: str | None = None,
     output_dir: str | None = None,
     upload: bool = True,
@@ -381,7 +380,7 @@ async def create_drama_video(
     # ── 3. TTS audio ──────────────────────────────────────────────────────────
     print("\n[3/6] Generating multi-voice TTS audio...")
     tts_dir = os.path.join(output_dir, "tts")
-    tts = await generate_drama_audio(script, tts_dir)
+    tts = generate_drama_audio(script, tts_dir)
     dur = tts["total_duration"]
     print(f"  Duration: {dur:.1f}s ({dur/60:.1f} min) | {len(tts['segments'])} segments")
 
@@ -452,8 +451,8 @@ if __name__ == "__main__":
     parser.add_argument("--output",    type=str,  default=None, help="Output directory")
     args = parser.parse_args()
 
-    asyncio.run(create_drama_video(
+    create_drama_video(
         story_seed=args.seed,
         output_dir=args.output,
         upload=not args.no_upload,
-    ))
+    )

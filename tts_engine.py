@@ -2,18 +2,20 @@
 tts_engine.py — Multi-voice TTS for Drama Desk.
 
 Parses [SPEAKER] tagged scripts and generates separate audio per segment
-using Microsoft Edge TTS neural voices.  All segments are concatenated into
-a single MP3 with word-level timing data for subtitle generation.
+using Kokoro-82M (open-weight, highly expressive emotional voices).
+Works on GitHub Actions (CPU/ONNX) and locally (GPU if available).
+All segments are concatenated into a single MP3.
 """
 
 import os
-import asyncio
 import re
 import subprocess
+import urllib.request
 from dataclasses import dataclass, field
 
-import edge_tts
 import imageio_ffmpeg
+import numpy as np
+import soundfile as sf
 
 from config import VOICES, SPEAKER_LABELS
 
@@ -28,7 +30,7 @@ class ScriptSegment:
     audio_path: str = ""
     start: float = 0.0
     duration: float = 0.0
-    words: list = field(default_factory=list)   # [{word, start, end}]
+    words: list = field(default_factory=list)
 
 
 # ── Script parser ─────────────────────────────────────────────────────────────
@@ -50,6 +52,45 @@ def parse_script(script: str) -> list[ScriptSegment]:
     return segments
 
 
+# ── Kokoro model (lazy singleton) ────────────────────────────────────────────
+
+_kokoro = None
+
+_MODEL_DIR   = os.path.join(os.path.dirname(__file__), "models")
+_MODEL_URL   = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.int8.onnx"
+_VOICES_URL  = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin"
+_MODEL_FILE  = os.path.join(_MODEL_DIR, "kokoro-v1.0.int8.onnx")
+_VOICES_FILE = os.path.join(_MODEL_DIR, "voices-v1.0.bin")
+
+
+def _download_if_missing(url: str, dest: str):
+    if not os.path.exists(dest):
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        print(f"[tts] Downloading {os.path.basename(dest)} ...")
+        urllib.request.urlretrieve(url, dest)
+        print(f"[tts] Saved → {dest}")
+
+
+def _get_kokoro():
+    global _kokoro
+    if _kokoro is not None:
+        return _kokoro
+    try:
+        from kokoro_onnx import Kokoro as _KokoroOnnx
+        _download_if_missing(_MODEL_URL,  _MODEL_FILE)
+        _download_if_missing(_VOICES_URL, _VOICES_FILE)
+        print("[tts] Loading Kokoro model...")
+        _kokoro = _KokoroOnnx(_MODEL_FILE, _VOICES_FILE)
+        print("[tts] Kokoro model ready.")
+    except Exception as e:
+        raise RuntimeError(
+            f"[tts] Kokoro init failed: {e}\n"
+            "Run: pip install kokoro-onnx soundfile\n"
+            "Linux: sudo apt-get install -y espeak-ng"
+        )
+    return _kokoro
+
+
 # ── Audio helpers ─────────────────────────────────────────────────────────────
 
 def _get_audio_duration(path: str) -> float:
@@ -66,33 +107,16 @@ def _get_audio_duration(path: str) -> float:
     return 0.0
 
 
-def _parse_srt_words(srt: str) -> list:
-    """Parse Edge TTS SubMaker SRT into word-timing dicts."""
-    words = []
-    for block in srt.strip().split("\n\n"):
-        lines = [ln.strip() for ln in block.strip().splitlines() if ln.strip()]
-        if len(lines) < 3:
-            continue
-        try:
-            start_s, end_s = lines[1].split(" --> ")
-            words.append({
-                "start": _t(start_s),
-                "end":   _t(end_s),
-                "word":  " ".join(lines[2:]),
-            })
-        except Exception:
-            continue
-    return words
-
-
-def _t(s: str) -> float:
-    s = s.strip().replace(",", ".")
-    h, m, sec = s.split(":")
-    return int(h) * 3600 + int(m) * 60 + float(sec)
+def _wav_to_mp3(wav_path: str, mp3_path: str) -> None:
+    ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+    subprocess.run(
+        [ffmpeg, "-y", "-i", wav_path, "-codec:a", "libmp3lame", "-q:a", "2", mp3_path],
+        check=True, capture_output=True, timeout=60,
+    )
+    os.remove(wav_path)
 
 
 def _concat_audio(paths: list[str], output: str) -> None:
-    """Concatenate MP3 files via ffmpeg concat demuxer."""
     ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
     list_file = output + ".list.txt"
     with open(list_file, "w", encoding="utf-8") as f:
@@ -107,7 +131,6 @@ def _concat_audio(paths: list[str], output: str) -> None:
 
 
 def _group_captions(words: list, group_size: int = 4) -> list:
-    """Group word-timing dicts into subtitle chunks."""
     captions = []
     for i in range(0, len(words), group_size):
         group = words[i : i + group_size]
@@ -120,32 +143,31 @@ def _group_captions(words: list, group_size: int = 4) -> list:
     return captions
 
 
-# ── Per-segment TTS ───────────────────────────────────────────────────────────
+# ── Per-segment synthesis ─────────────────────────────────────────────────────
 
-async def _synthesize_segment(seg: ScriptSegment, path: str) -> tuple[float, list]:
-    """
-    Generate TTS audio for one segment.
-    Returns (duration_seconds, word_timings).
-    """
-    communicate = edge_tts.Communicate(seg.text, seg.voice)
-    submaker = edge_tts.SubMaker()
+def _synthesize_segment(seg: ScriptSegment, path: str) -> float:
+    """Generate Kokoro audio for one segment. Returns duration (seconds)."""
+    kokoro = _get_kokoro()
+    # Clean up stage directions in parentheses, e.g. "(Gasps)" "(Crying)"
+    text = re.sub(r"\([^)]*\)", "", seg.text).strip()
+    if not text:
+        text = seg.text.strip()
 
-    with open(path, "wb") as f:
-        async for chunk in communicate.stream():
-            if chunk["type"] == "audio":
-                f.write(chunk["data"])
-            elif chunk["type"] == "WordBoundary":
-                submaker.feed(chunk)
-
-    srt = submaker.get_srt()
-    words = _parse_srt_words(srt)
-    duration = _get_audio_duration(path)
-    return duration, words
+    samples, sample_rate = kokoro.create(
+        text,
+        voice=seg.voice,
+        speed=1.0,
+        lang="en-us",
+    )
+    wav_path = path.replace(".mp3", ".wav")
+    sf.write(wav_path, samples, sample_rate)
+    _wav_to_mp3(wav_path, path)
+    return _get_audio_duration(path)
 
 
 # ── Main entry point ──────────────────────────────────────────────────────────
 
-async def generate_drama_audio(script: str, output_dir: str) -> dict:
+def generate_drama_audio(script: str, output_dir: str) -> dict:
     """
     Generate multi-voice audio for the full drama script.
 
@@ -173,12 +195,12 @@ async def generate_drama_audio(script: str, output_dir: str) -> dict:
         label = SPEAKER_LABELS.get(seg.speaker, seg.speaker)
 
         try:
-            duration, words = await _synthesize_segment(seg, path)
+            duration = _synthesize_segment(seg, path)
         except Exception as e:
             print(f"[tts] Segment {i} ({seg.speaker}) failed: {e} — retrying with NARRATOR voice")
             try:
                 seg.voice = VOICES["NARRATOR"]
-                duration, words = await _synthesize_segment(seg, path)
+                duration = _synthesize_segment(seg, path)
             except Exception as e2:
                 print(f"[tts] Segment {i} skipped after retry: {e2}")
                 continue
@@ -186,16 +208,6 @@ async def generate_drama_audio(script: str, output_dir: str) -> dict:
         seg.audio_path = path
         seg.start = current_time
         seg.duration = duration
-        seg.words = words
-
-        # Offset word timings to absolute position in combined audio
-        for w in words:
-            all_words.append({
-                "word":    w["word"],
-                "start":   current_time + w["start"],
-                "end":     current_time + w["end"],
-                "speaker": seg.speaker,
-            })
 
         current_time += duration
         segment_paths.append(path)
@@ -205,11 +217,8 @@ async def generate_drama_audio(script: str, output_dir: str) -> dict:
     if not segment_paths:
         raise RuntimeError("All TTS segments failed")
 
-    # Combine all segments into one file
     combined = os.path.join(output_dir, "combined_audio.mp3")
     _concat_audio(segment_paths, combined)
-
-    captions = _group_captions(all_words, group_size=4)
 
     print(f"[tts] Total audio: {current_time:.1f}s ({current_time / 60:.1f} min)")
 
@@ -225,6 +234,6 @@ async def generate_drama_audio(script: str, output_dir: str) -> dict:
             }
             for s in segments if s.audio_path
         ],
-        "captions": captions,
+        "captions": _group_captions(all_words, group_size=4),
         "total_duration": current_time,
     }

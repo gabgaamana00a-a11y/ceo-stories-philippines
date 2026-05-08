@@ -22,16 +22,22 @@ VIDEO_FPS    = 30
 SCRIPT_MIN_WORDS = 700
 SCRIPT_MAX_WORDS = 1200
 
-# ── TTS voices (Microsoft Edge TTS neural voices) ────────────────────────────
-# Multi-voice cast gives a "radio drama" feel
+# ── TTS voices (Kokoro-82M — open-weight, emotional, runs on CPU/GPU) ────────
+# Grade A/A- voices chosen for maximum expressiveness.
+# Local: GPU-accelerated via PyTorch. GitHub Actions: CPU via ONNX.
 VOICES = {
-    "NARRATOR":     "en-US-AriaNeural",    # Warm authoritative host
-    "OP":           "en-US-JennyNeural",   # Female original poster
-    "OP_MALE":      "en-US-GuyNeural",     # Male original poster
-    "CHARACTER_F":  "en-US-NancyNeural",   # Primary female character
-    "CHARACTER_M":  "en-US-TonyNeural",    # Primary male character
-    "CHARACTER_F2": "en-US-SaraNeural",    # Secondary female character
-    "CHARACTER_M2": "en-US-DavisNeural",   # Secondary male character
+    "NARRATOR":     "af_heart",    # Grade A — warmest, most emotional female narrator
+    "OP":           "af_bella",    # Grade A- — passionate, great for personal monologues
+    "OP_MALE":      "am_michael",  # Grade B — authoritative male storyteller
+    "CHARACTER_F":  "af_nicole",   # Grade B- — distinctive, opinionated
+    "CHARACTER_M":  "am_fenrir",   # Grade B — dramatic deep male
+    "CHARACTER_F2": "af_aoede",    # Grade B — warm secondary female
+    "CHARACTER_M2": "am_puck",     # Grade B — lighter younger male
+    # Aliases used by LLM-generated scripts
+    "HER":          "af_nicole",
+    "HIM":          "am_fenrir",
+    "HER_FRIEND":   "af_aoede",
+    "HIS_FRIEND":   "am_puck",
 }
 
 # Human-readable display names shown as on-screen speaker labels
