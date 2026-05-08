@@ -1,0 +1,27 @@
+# Core
+python-dotenv
+requests
+moviepy
+
+# TTS — multi-voice drama narration
+edge-tts
+
+# Video processing
+imageio
+imageio-ffmpeg
+numpy
+
+# Images / thumbnails
+Pillow
+
+# YouTube API
+google-api-python-client
+google-auth-oauthlib
+google-auth-httplib2
+
+# Local scheduler (optional, for running without GitHub Actions)
+apscheduler
+flask
+
+# Trending
+pytrends

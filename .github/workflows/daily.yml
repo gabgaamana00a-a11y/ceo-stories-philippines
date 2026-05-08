@@ -1,0 +1,104 @@
+name: Daily Drama Video
+
+# ── Triggers ──────────────────────────────────────────────────────────────────
+on:
+  schedule:
+    # 9 AM EST = 2 PM UTC — posts when US audience is waking up
+    - cron: "0 14 * * *"
+  workflow_dispatch:
+    inputs:
+      story_seed:
+        description: "Custom story seed (leave blank for trending)"
+        required: false
+        default: ""
+      upload:
+        description: "Upload to YouTube?"
+        required: false
+        default: "true"
+        type: choice
+        options: ["true", "false"]
+
+# ── Permissions ───────────────────────────────────────────────────────────────
+permissions:
+  contents: read
+
+# ── Job ───────────────────────────────────────────────────────────────────────
+jobs:
+  generate-and-upload:
+    name: Generate + Upload Drama Video
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      # ── 1. Checkout ─────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Python setup ─────────────────────────────────────────────────────
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      # ── 3. System deps ───────────────────────────────────────────────────────
+      - name: Install ffmpeg
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y ffmpeg libfontconfig1
+
+      # ── 4. Python deps ───────────────────────────────────────────────────────
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      # ── 5. Write secret files ────────────────────────────────────────────────
+      #
+      # REQUIRED GitHub Secrets:
+      #   OPENROUTER_API_KEY        — OpenRouter key for script generation
+      #   PEXELS_API_KEY            — Pexels key for free B-roll video
+      #   YOUTUBE_TOKEN_JSON        — Contents of your token.json (OAuth token)
+      #   YOUTUBE_CREDENTIALS_JSON  — Contents of your credentials.json (OAuth client)
+      #
+      # OPTIONAL:
+      #   PIXABAY_API_KEY           — Pixabay fallback B-roll (free)
+      #
+      - name: Write YouTube credentials from secrets
+        env:
+          YOUTUBE_TOKEN_JSON:       ${{ secrets.YOUTUBE_TOKEN_JSON }}
+          YOUTUBE_CREDENTIALS_JSON: ${{ secrets.YOUTUBE_CREDENTIALS_JSON }}
+        run: |
+          echo "$YOUTUBE_TOKEN_JSON"       > token.json
+          echo "$YOUTUBE_CREDENTIALS_JSON" > credentials.json
+
+      # ── 6. Run pipeline ──────────────────────────────────────────────────────
+      - name: Generate drama video
+        env:
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          PEXELS_API_KEY:     ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY:    ${{ secrets.PIXABAY_API_KEY }}
+        run: |
+          SEED="${{ github.event.inputs.story_seed }}"
+          UPLOAD="${{ github.event.inputs.upload }}"
+
+          # Scheduled runs: always upload
+          if [ -z "$UPLOAD" ]; then UPLOAD="true"; fi
+
+          ARGS=""
+          if [ -n "$SEED" ]; then ARGS="--seed \"$SEED\""; fi
+          if [ "$UPLOAD" = "false" ]; then ARGS="$ARGS --no-upload"; fi
+
+          python main.py $ARGS
+
+      # ── 7. Save artifact ─────────────────────────────────────────────────────
+      - name: Upload output artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: drama-video-${{ github.run_number }}
+          # Upload video, thumbnail, and script — NOT the full tts/ folder
+          path: |
+            output/**/drama_video.mp4
+            output/**/thumbnail.png
+            output/**/script.txt
+            output/**/result.json
+          retention-days: 7
