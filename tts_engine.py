@@ -35,20 +35,72 @@ class ScriptSegment:
 
 # ── Script parser ─────────────────────────────────────────────────────────────
 
+# Fixed anchors — these three always get a specific voice
+_FIXED_VOICES = {
+    "NARRATOR": VOICES["NARRATOR"],   # af_heart
+    "OP":       VOICES["OP"],         # af_bella
+    "OP_MALE":  VOICES["OP_MALE"],    # am_michael
+}
+
+# Pools for dynamic character assignment — ordered by expressiveness
+_FEMALE_POOL = ["af_nicole", "af_aoede", "af_kore", "af_sky",   "af_sarah"]
+_MALE_POOL   = ["am_fenrir", "am_puck",  "am_eric", "am_adam",  "am_echo"]
+
+_MALE_HINTS = {"_M_", "_MALE", "HIM", "DAD", "BRO", "BOY", "MAN",
+               "HUSBAND", "FATHER", "SON", "UNCLE", "BROTHER", "BOYFRIEND"}
+
+
+def _is_male_speaker(tag: str) -> bool:
+    tag_up = tag.upper()
+    # Match whole-word hints: CHARACTER_M but NOT CHARACTER_F2 or HER_FRIEND
+    if re.search(r"(?<![A-Z])M(?![A-Z0-9])", tag_up):  # lone M at end after _
+        pass  # handled by _M_ check below
+    return any(
+        tag_up == h or tag_up.endswith(h) or tag_up.startswith(h + "_") or ("_" + h) in tag_up
+        for h in _MALE_HINTS
+    ) or bool(re.search(r"_M\d*$", tag_up))  # CHARACTER_M, CHARACTER_M2, etc.
+
+
 def parse_script(script: str) -> list[ScriptSegment]:
-    """Split [SPEAKER] tagged script into segments."""
+    """Split [SPEAKER] tagged script into segments.
+
+    Voice assignment:
+    - NARRATOR / OP / OP_MALE → fixed voices from config
+    - Every other unique speaker tag → assigned dynamically from a voice pool,
+      so no two characters ever share the same voice.
+    """
     pattern = re.compile(
         r"\[([A-Z_0-9]+)\]\s*(.*?)(?=\n\s*\[[A-Z_0-9]+\]|$)",
         re.DOTALL,
     )
+
+    # Dynamic assignment state (local to this parse call)
+    assigned: dict[str, str] = {}
+    f_used: list[str] = []
+    m_used: list[str] = []
+
+    def _assign_voice(speaker: str) -> str:
+        if speaker in _FIXED_VOICES:
+            return _FIXED_VOICES[speaker]
+        if speaker in assigned:
+            return assigned[speaker]
+        if _is_male_speaker(speaker):
+            pool, used = _MALE_POOL, m_used
+        else:
+            pool, used = _FEMALE_POOL, f_used
+        # Pick next voice not yet used in this script
+        voice = next((v for v in pool if v not in used), pool[len(used) % len(pool)])
+        used.append(voice)
+        assigned[speaker] = voice
+        return voice
+
     segments = []
     for m in pattern.finditer(script):
         speaker = m.group(1).strip()
         text = m.group(2).strip()
         if not text:
             continue
-        voice = VOICES.get(speaker, VOICES["NARRATOR"])
-        segments.append(ScriptSegment(speaker=speaker, text=text, voice=voice))
+        segments.append(ScriptSegment(speaker=speaker, text=text, voice=_assign_voice(speaker)))
     return segments
 
 
