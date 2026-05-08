@@ -17,8 +17,10 @@ import os
 import random
 import subprocess
 import shutil
+import textwrap
 import requests
 import imageio_ffmpeg
+from PIL import Image, ImageDraw, ImageFont
 
 from config import VIDEO_WIDTH, VIDEO_HEIGHT, VIDEO_FPS, SCENE_KEYWORDS
 
@@ -316,7 +318,297 @@ def write_ass_subtitles(captions: list, segments: list, ass_path: str) -> str:
     return ass_path
 
 
-# ── Final render ──────────────────────────────────────────────────────────────
+# ── Reddit-style PIL renderer ─────────────────────────────────────────────────
+#
+# Mimics top AITA/Reddit drama channels:
+#   • NARRATOR/OP segments → Reddit dark-mode post card (like a screenshot)
+#   • Dialogue segments    → Chat bubbles with speaker color + history
+# No B-roll downloads needed — renders instantly.
+
+_MONOLOGUE_SPEAKERS = {"NARRATOR", "OP", "OP_MALE"}
+
+_SPEAKER_COLORS = {
+    "NARRATOR":     (155, 155, 155),
+    "OP":           (30,  130, 220),
+    "OP_MALE":      (30,  110, 200),
+    "HER":          (200,  75, 200),
+    "HIM":          (75,  185,  75),
+    "HER FRIEND":   (255, 155,  35),
+    "HIS FRIEND":   (75,  200, 155),
+    "CHARACTER_F":  (200,  75, 200),
+    "CHARACTER_M":  (75,  185,  75),
+    "CHARACTER_F2": (255, 120, 155),
+    "CHARACTER_M2": (75,  175, 220),
+}
+
+_LABEL_MAP = {
+    "NARRATOR":     "Narrator",
+    "OP":           "OP  (Original Poster)",
+    "OP_MALE":      "OP  (Original Poster)",
+    "HER":          "Her",
+    "HIM":          "Him",
+    "HER FRIEND":   "Their Friend",
+    "HIS FRIEND":   "Their Friend",
+    "CHARACTER_F":  "Her",
+    "CHARACTER_M":  "Him",
+    "CHARACTER_F2": "Her Friend",
+    "CHARACTER_M2": "His Friend",
+}
+
+
+def _vchat_font(name: str, size: int) -> ImageFont.FreeTypeFont:
+    for path in [name, f"C:\\Windows\\Fonts\\{name}",
+                 f"/usr/share/fonts/truetype/msttcorefonts/{name}"]:
+        try:
+            return ImageFont.truetype(path, size)
+        except Exception:
+            pass
+    return ImageFont.load_default()
+
+
+def _speaker_color(speaker: str) -> tuple:
+    if speaker in _SPEAKER_COLORS:
+        return _SPEAKER_COLORS[speaker]
+    for key, col in _SPEAKER_COLORS.items():
+        if key in speaker or speaker in key:
+            return col
+    return (150, 150, 150)
+
+
+def _draw_reddit_header(draw, W: int, font) -> None:
+    """Orange top-bar with r/AmItheAsshole branding."""
+    draw.rectangle([0, 0, W, 82], fill=(162, 35, 5))
+    draw.rectangle([0, 82, W, 87], fill=(255, 75, 18))
+    draw.text((28, 18), "r/AmItheAsshole  •  Drama Desk",
+              fill=(255, 220, 195), font=font)
+    draw.text((W - 455, 18), "Drop your verdict below \u2193",
+              fill=(255, 170, 125), font=font)
+
+
+def _make_card_frame(seg: dict, W: int = 1920, H: int = 1080) -> Image.Image:
+    """Reddit dark-mode post card for NARRATOR / OP segments."""
+    img  = Image.new("RGB", (W, H), (8, 3, 3))
+    draw = ImageDraw.Draw(img)
+
+    f_hdr  = _vchat_font("arialbd.ttf", 35)
+    f_sub  = _vchat_font("arialbd.ttf", 28)
+    f_meta = _vchat_font("arial.ttf",   24)
+    f_body = _vchat_font("arial.ttf",   34)
+    f_foot = _vchat_font("arial.ttf",   24)
+
+    _draw_reddit_header(draw, W, f_hdr)
+
+    # Card dimensions
+    CX, CY = 130, 105
+    CW, CH = W - 260, H - 125
+    draw.rectangle([CX, CY, CX + CW, CY + CH], fill=(28, 24, 28))
+    draw.rectangle([CX, CY, CX + CW, CY + CH], outline=(55, 50, 55), width=2)
+    draw.rectangle([CX, CY, CX + 5, CY + CH], fill=(255, 69, 0))  # Reddit orange left bar
+
+    tx = CX + 26
+    y  = CY + 18
+
+    # Subreddit + meta line
+    draw.text((tx, y), "r/AmItheAsshole", fill=(255, 95, 35), font=f_sub)
+    y += 36
+    spk  = seg.get("speaker", "NARRATOR")
+    meta = ("u/throwaway_aita_user  \u2022  14 hours ago  \u2022  \U0001f3c6 Best of r/AITA"
+            if spk in ("OP", "OP_MALE") else "\U0001f399\ufe0f  Narrator")
+    draw.text((tx, y), meta, fill=(128, 120, 128), font=f_meta)
+    y += 32
+    draw.rectangle([CX + 18, y, CX + CW - 18, y + 1], fill=(55, 50, 55))
+    y += 14
+
+    # Body text
+    WRAP     = 74
+    LINE_H   = 44
+    max_lines = (CH - (y - CY) - 58) // LINE_H
+    lines    = textwrap.wrap(seg.get("text", ""), width=WRAP)
+    for line in lines[:max_lines]:
+        draw.text((tx, y), line, fill=(205, 198, 205), font=f_body)
+        y += LINE_H
+    if len(lines) > max_lines:
+        draw.text((tx, y), "\u2026", fill=(130, 122, 130), font=f_body)
+
+    # Footer (mock engagement stats)
+    fy = CY + CH - 42
+    draw.rectangle([CX + 18, fy - 6, CX + CW - 18, fy - 5], fill=(50, 46, 50))
+    draw.text((tx, fy), "\u25b2  24.7k    \U0001f4ac 3.2k comments    Share    Save",
+              fill=(120, 115, 120), font=f_foot)
+    return img
+
+
+def _make_bubble_frame(history: list, W: int = 1920, H: int = 1080) -> Image.Image:
+    """Chat-bubble frame for dialogue speakers."""
+    img  = Image.new("RGB", (W, H), (10, 3, 3))
+    draw = ImageDraw.Draw(img)
+
+    f_hdr  = _vchat_font("arialbd.ttf", 35)
+    f_lbl  = _vchat_font("arialbd.ttf", 27)
+    f_text = _vchat_font("arial.ttf",   40)
+    _draw_reddit_header(draw, W, f_hdr)
+
+    BX, BW  = 75, W - 150
+    PAD     = 20
+    LINE_H  = 50
+    LABEL_H = 34
+    GAP     = 10
+    WRAP    = 68
+
+    def bh(txt: str) -> int:
+        return LABEL_H + PAD + max(1, len(textwrap.wrap(txt, width=WRAP)[:6])) * LINE_H + PAD
+
+    # Fit bubbles bottom-up (cap at last 8 to avoid overrun)
+    avail   = H - 97 - 12
+    visible = []
+    used    = 0
+    for item in reversed(history[-8:]):
+        h = bh(item[2]) + GAP
+        used += h
+        if used > avail:
+            break
+        visible.insert(0, item)
+
+    y = 97
+    for spk, lbl, txt, is_cur in visible:
+        color  = _speaker_color(spk)
+        op     = 1.0 if is_cur else 0.48
+        c_dim  = tuple(int(v * op) for v in color)
+        lines  = textwrap.wrap(txt, width=WRAP)[:6]
+        height = bh(txt)
+
+        draw.text((BX, y + 4), lbl.upper(), fill=c_dim, font=f_lbl)
+
+        b_y0 = y + LABEL_H
+        b_y1 = b_y0 + PAD + len(lines) * LINE_H + PAD
+
+        ov = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        od = ImageDraw.Draw(ov)
+        od.rounded_rectangle(
+            [BX, b_y0, BX + BW, b_y1], radius=16,
+            fill=(*color, int(55 * op)),
+            outline=(*color, int(180 * op)),
+            width=3,
+        )
+        img  = Image.alpha_composite(img.convert("RGBA"), ov).convert("RGB")
+        draw = ImageDraw.Draw(img)
+
+        tc = (255, 255, 255) if is_cur else (165, 158, 165)
+        for j, line in enumerate(lines):
+            draw.text((BX + PAD, b_y0 + PAD + j * LINE_H), line, fill=tc, font=f_text)
+
+        y += height + GAP
+
+    return img
+
+
+def render_chat_video(
+    audio_path: str,
+    segments: list,
+    output_path: str,
+    music_path: str | None = None,
+) -> str:
+    """
+    Render Reddit-style video: post cards for narration, chat bubbles for dialogue.
+    No Pexels B-roll downloads needed. Looks like top AITA channels.
+    """
+    ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+    base   = os.path.dirname(output_path) or "."
+    fd     = os.path.join(base, "_frames")
+    os.makedirs(fd, exist_ok=True)
+
+    audio_duration = sum(s["duration"] for s in segments)
+    print(f"[render] Generating {len(segments)} Reddit-style frames...")
+
+    frame_entries = []
+    history       = []   # (speaker, label, text, is_current)
+
+    for i, seg in enumerate(segments):
+        spk = seg["speaker"]
+        lbl = _LABEL_MAP.get(spk, seg.get("label", spk))
+        txt = seg["text"]
+        dur = seg["duration"]
+
+        history = [(s, l, t, False) for s, l, t, _ in history]
+        history.append((spk, lbl, txt, True))
+
+        frame = (_make_card_frame(seg)
+                 if spk in _MONOLOGUE_SPEAKERS
+                 else _make_bubble_frame(history))
+
+        fpath = os.path.join(fd, f"frame_{i:04d}.png")
+        frame.save(fpath, "PNG")
+        frame_entries.append((fpath, dur))
+        print(f"[render]   [{spk}] frame {i+1}/{len(segments)} ({dur:.1f}s)")
+
+    # Write ffmpeg image concat list
+    list_file = os.path.join(base, "_frames.txt")
+    with open(list_file, "w", encoding="utf-8") as f:
+        for fp, dur in frame_entries:
+            abs_fp = os.path.abspath(fp).replace("\\", "/")
+            f.write(f"file '{abs_fp}'\nduration {dur:.4f}\n")
+        # Repeat last frame to prevent ffmpeg concat truncation
+        if frame_entries:
+            abs_fp = os.path.abspath(frame_entries[-1][0]).replace("\\", "/")
+            f.write(f"file '{abs_fp}'\nduration 0.1\n")
+
+    # Encode frames → silent video
+    silent = os.path.join(base, "_chat_silent.mp4")
+    print("[render] Encoding frames to video...")
+    result = subprocess.run([
+        ffmpeg, "-y", "-f", "concat", "-safe", "0", "-i", list_file,
+        "-vf", f"fps={VIDEO_FPS},scale={VIDEO_WIDTH}:{VIDEO_HEIGHT}",
+        *_encode_args(), "-pix_fmt", "yuv420p",
+        "-t", str(audio_duration + 0.5),
+        silent,
+    ], capture_output=True, text=True, timeout=900)
+    if result.returncode != 0:
+        raise RuntimeError(f"Frame encode failed:\n{result.stderr[-800:]}")
+
+    # Mux audio + optional music
+    has_music    = music_path and os.path.exists(music_path)
+    fade_out     = max(0, audio_duration - 4)
+    print("[render] Assembling final video...")
+
+    if has_music:
+        afilt = (
+            "[1:a]volume=1.0[speech];"
+            f"[2:a]volume=0.07,afade=t=in:st=0:d=3,"
+            f"afade=t=out:st={fade_out:.1f}:d=4[music];"
+            "[speech][music]amix=inputs=2:dropout_transition=3[aout]"
+        )
+        cmd = [
+            ffmpeg, "-y", "-i", silent, "-i", audio_path, "-i", music_path,
+            "-filter_complex", afilt, "-map", "0:v", "-map", "[aout]",
+            *_encode_args(), "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart",
+            "-t", str(audio_duration), output_path,
+        ]
+    else:
+        cmd = [
+            ffmpeg, "-y", "-i", silent, "-i", audio_path,
+            "-map", "0:v", "-map", "1:a",
+            *_encode_args(), "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart",
+            "-t", str(audio_duration), output_path,
+        ]
+
+    result2 = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+    if result2.returncode != 0:
+        raise RuntimeError(f"Final mux failed:\n{result2.stderr[-800:]}")
+
+    # Cleanup
+    os.remove(list_file)
+    if os.path.exists(silent):
+        os.remove(silent)
+    shutil.rmtree(fd, ignore_errors=True)
+
+    sz = os.path.getsize(output_path) / 1_000_000
+    print(f"[render] Done: {output_path} ({sz:.1f} MB)")
+    return output_path
+
+
+# ── Final render (public entry point) ─────────────────────────────────────────
 
 def render_drama_video(
     audio_path: str,
@@ -327,100 +619,19 @@ def render_drama_video(
     music_path: str | None = None,
 ) -> str:
     """
-    Full render:
-      1. Build Pexels background video
-      2. Loop/trim background to exact audio duration
-      3. Burn in ASS subtitles
-      4. Mix TTS + optional music bed (music at ~8% volume)
-      5. Output final MP4
+    Render final video using Reddit-style chat/post-card frames.
+    scene_tags and captions kept for API compatibility but not used.
     """
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
-    ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
-    base   = os.path.dirname(output_path)
-
-    # ── Measure audio duration ────────────────────────────────────────────────
-    dur_result = subprocess.run(
-        [ffmpeg, "-i", audio_path, "-f", "null", "-"],
+    dur_res = subprocess.run(
+        [imageio_ffmpeg.get_ffmpeg_exe(), "-i", audio_path, "-f", "null", "-"],
         capture_output=True, text=True, timeout=30,
     )
     audio_duration = 0.0
-    for line in dur_result.stderr.splitlines():
+    for line in dur_res.stderr.splitlines():
         if "Duration:" in line:
             t = line.split("Duration:")[1].split(",")[0].strip()
             h, m, s = t.split(":")
             audio_duration = int(h) * 3600 + int(m) * 60 + float(s)
     print(f"[render] Audio duration: {audio_duration:.1f}s ({audio_duration/60:.1f} min)")
-
-    # ── 1. Background video ───────────────────────────────────────────────────
-    bg_raw  = os.path.join(base, "_bg_raw.mp4")
-    bg_trim = os.path.join(base, "_bg_trim.mp4")
-    ass_path = os.path.join(base, "_subs.ass")
-
-    print("[render] Fetching background video from Pexels...")
-    build_background_video(bg_raw, audio_duration, scene_tags or [])
-
-    # Loop & trim background to exact audio length
-    subprocess.run(
-        [ffmpeg, "-y", "-stream_loop", "-1", "-i", bg_raw,
-         "-t", str(audio_duration), "-c", "copy", bg_trim],
-        check=True, capture_output=True, timeout=300,
-    )
-
-    # ── 2. Subtitles ──────────────────────────────────────────────────────────
-    print("[render] Writing subtitles...")
-    write_ass_subtitles(captions, segments, ass_path)
-    ass_escaped = ass_path.replace("\\", "/").replace(":", "\\:")
-
-    # ── 3. Final assembly ─────────────────────────────────────────────────────
-    print("[render] Assembling final video...")
-
-    has_music = music_path and os.path.exists(music_path)
-    fade_out_start = max(0, audio_duration - 4)
-
-    if has_music:
-        audio_filter = (
-            "[1:a]volume=1.0[speech];"
-            f"[2:a]volume=0.08,afade=t=in:st=0:d=3,"
-            f"afade=t=out:st={fade_out_start:.1f}:d=4[music];"
-            "[speech][music]amix=inputs=2:dropout_transition=3[aout]"
-        )
-        cmd = [
-            ffmpeg, "-y",
-            "-i", bg_trim,
-            "-i", audio_path,
-            "-i", music_path,
-            "-filter_complex",
-            f"[0:v]ass={ass_escaped}[v];{audio_filter}",
-            "-map", "[v]", "-map", "[aout]",
-            *_encode_args(), "-pix_fmt", "yuv420p",
-            "-c:a", "aac", "-b:a", "192k",
-            "-movflags", "+faststart",
-            "-t", str(audio_duration),
-            output_path,
-        ]
-    else:
-        cmd = [
-            ffmpeg, "-y",
-            "-i", bg_trim,
-            "-i", audio_path,
-            "-filter_complex", f"[0:v]ass={ass_escaped}[v]",
-            "-map", "[v]", "-map", "1:a",
-            *_encode_args(), "-pix_fmt", "yuv420p",
-            "-c:a", "aac", "-b:a", "192k",
-            "-movflags", "+faststart",
-            "-t", str(audio_duration),
-            output_path,
-        ]
-
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
-    if result.returncode != 0:
-        raise RuntimeError(f"Final render failed:\n{result.stderr[-1200:]}")
-
-    # ── Cleanup temp files ────────────────────────────────────────────────────
-    for p in [bg_raw, bg_trim, ass_path]:
-        if os.path.exists(p):
-            os.remove(p)
-
-    size_mb = os.path.getsize(output_path) / 1_000_000
-    print(f"[render] Done: {output_path} ({size_mb:.1f} MB)")
-    return output_path
+    return render_chat_video(audio_path, segments, output_path, music_path)
