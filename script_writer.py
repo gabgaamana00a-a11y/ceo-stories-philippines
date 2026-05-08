@@ -21,12 +21,25 @@ TARGET AUDIENCE: US adults 18-45. They scroll fast. You have 8 seconds to hook t
 
 SPEAKER TAGS — use ONLY these, exactly as written:
   [NARRATOR]     — The host. Warm, reactive, feels like a best friend spilling tea.
-  [OP]           — The original poster (female stories)
-  [OP_MALE]      — The original poster (male stories)
-  [CHARACTER_F]  — Primary female character (use her real American name in dialogue)
-  [CHARACTER_M]  — Primary male character (use his real American name in dialogue)
+  [OP]           — The original poster (female stories). Use for EVERY OP line, including dialogue exchanges.
+  [OP_MALE]      — The original poster (male stories). Use for EVERY OP line, including dialogue exchanges.
+  [CHARACTER_F]  — Primary female character (use her real American name in the text)
+  [CHARACTER_M]  — Primary male character (use his real American name in the text)
   [CHARACTER_F2] — Secondary female character (only if needed)
   [CHARACTER_M2] — Secondary male character (only if needed)
+
+FORBIDDEN — NEVER use these tags: [HER] [HIM] [SHE] [HE] [THEM] [FRIEND] [MOM] [DAD] [SIS] [BRO]
+Each person MUST have their own unique tag from the list above.
+
+CORRECT example of a dialogue exchange:
+[OP] So I walked up to her and said — are you serious right now?
+[CHARACTER_F] I'm serious. You had no right to say that.
+[OP] I had every right! You asked for my opinion.
+[CHARACTER_F] I asked you to be supportive, not brutal.
+
+WRONG (never do this):
+[HER] She said something.
+[HIM] He replied.
 
 ═══ VIRAL HOOK FORMULA (NON-NEGOTIABLE) ═══
 
@@ -93,6 +106,43 @@ US CULTURAL CONTEXT:
 - Reference realistic American salaries, family dynamics, and social situations
 - The audience identifies with the OP — make them sympathetic but not perfect
 """
+
+
+import re as _re
+
+# Canonical speaker tags the pipeline understands
+_VALID_TAGS = {
+    "NARRATOR", "OP", "OP_MALE",
+    "CHARACTER_F", "CHARACTER_M", "CHARACTER_F2", "CHARACTER_M2",
+}
+
+# Map any stray LLM-generated tags → nearest valid tag
+_TAG_REMAP = {
+    "HER":        "CHARACTER_F",
+    "HIM":        "CHARACTER_M",
+    "SHE":        "CHARACTER_F",
+    "HE":         "CHARACTER_M",
+    "MOM":        "CHARACTER_F",
+    "DAD":        "CHARACTER_M",
+    "SIS":        "CHARACTER_F",
+    "BRO":        "CHARACTER_M",
+    "FRIEND":     "CHARACTER_F2",
+    "HER_FRIEND": "CHARACTER_F2",
+    "HIS_FRIEND": "CHARACTER_M2",
+    "THEM":       "CHARACTER_F2",
+}
+
+
+def _normalize_speaker_tags(script: str) -> str:
+    """Replace any non-standard [TAG] with the closest valid tag."""
+    def _replace(m):
+        tag = m.group(1).strip().upper().replace(" ", "_")
+        if tag in _VALID_TAGS:
+            return f"[{tag}]"
+        if tag in _TAG_REMAP:
+            return f"[{_TAG_REMAP[tag]}]"
+        return f"[{tag}]"   # leave unknown tags for fallback handling
+    return _re.sub(r"\[([A-Z][A-Z0-9_ ]*)\]", _replace, script)
 
 
 def generate_drama_script(story_seed: str) -> str:
@@ -166,6 +216,7 @@ End with the narrator asking viewers to comment their verdict."""
                     print("[script] Missing speaker tags — trying next model")
                     break
 
+                script = _normalize_speaker_tags(script)
                 return script
 
             except Exception as e:
@@ -173,7 +224,7 @@ End with the narrator asking viewers to comment their verdict."""
                 break
 
     print("[script] All models failed — using fallback script")
-    return _fallback_script(story_seed)
+    return _normalize_speaker_tags(_fallback_script(story_seed))
 
 
 def _fallback_script(story_seed: str) -> str:
