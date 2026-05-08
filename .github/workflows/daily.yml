@@ -45,7 +45,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y ffmpeg libfontconfig1 espeak-ng
+          sudo apt-get install -y ffmpeg libfontconfig1 espeak-ng fonts-liberation fonts-dejavu-core
 
       # ── 3b. Cache Kokoro model weights (~115 MB total, avoid re-downloading daily) ─
       - name: Cache Kokoro model
@@ -83,6 +83,7 @@ jobs:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           PEXELS_API_KEY:     ${{ secrets.PEXELS_API_KEY }}
           PIXABAY_API_KEY:    ${{ secrets.PIXABAY_API_KEY }}
+          JAMENDO_CLIENT_ID:  ${{ secrets.JAMENDO_CLIENT_ID }}
         run: |
           SEED="${{ github.event.inputs.story_seed }}"
           UPLOAD="${{ github.event.inputs.upload }}"

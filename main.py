@@ -269,7 +269,7 @@ def _find_music() -> str | None:
 
 # ── YouTube uploader ──────────────────────────────────────────────────────────
 
-def _upload_youtube(video_path: str, title: str, description: str) -> str | None:
+def _upload_youtube(video_path: str, title: str, description: str, thumb_path: str = None) -> str | None:
     try:
         import google.auth.transport.requests
         import google.oauth2.credentials
@@ -339,6 +339,18 @@ def _upload_youtube(video_path: str, title: str, description: str) -> str | None
         video_id = response.get("id", "")
         url = f"https://www.youtube.com/watch?v={video_id}"
         print(f"[youtube] Live: {url}")
+
+        # Set thumbnail on the uploaded video
+        if thumb_path and os.path.exists(thumb_path) and video_id:
+            try:
+                youtube.thumbnails().set(
+                    videoId=video_id,
+                    media_body=MediaFileUpload(thumb_path, mimetype="image/png"),
+                ).execute()
+                print("[youtube] Thumbnail set")
+            except Exception as e:
+                print(f"[youtube] Thumbnail upload failed: {e}")
+
         return url
 
     except Exception as e:
@@ -411,7 +423,7 @@ def create_drama_video(
     if upload:
         print("\n[6/6] Uploading to YouTube...")
         description = _make_description(story_seed, title)
-        url = _upload_youtube(video_path, title, description)
+        url = _upload_youtube(video_path, title, description, thumb_path=thumb_path)
     else:
         print("\n[6/6] Upload skipped (--no-upload flag)")
 

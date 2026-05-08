@@ -168,6 +168,18 @@ def _dark_gradient(W: int, H: int) -> "Image.Image":
 
 # ── Font helpers ──────────────────────────────────────────────────────────────
 
+_THUMB_LINUX_FONT_MAP = {
+    "impact.ttf":   ["LiberationSans-Bold.ttf",    "DejaVuSans-Bold.ttf"],
+    "arialbd.ttf":  ["LiberationSans-Bold.ttf",    "DejaVuSans-Bold.ttf"],
+    "arial.ttf":    ["LiberationSans-Regular.ttf", "DejaVuSans.ttf"],
+}
+_THUMB_LINUX_FONT_DIRS = [
+    "/usr/share/fonts/truetype/liberation/",
+    "/usr/share/fonts/truetype/dejavu/",
+    "/usr/share/fonts/truetype/",
+]
+
+
 def _font(name: str, size: int) -> "ImageFont.FreeTypeFont":
     candidates = [
         name,
@@ -175,6 +187,9 @@ def _font(name: str, size: int) -> "ImageFont.FreeTypeFont":
         f"/System/Library/Fonts/{name}",
         f"/usr/share/fonts/truetype/msttcorefonts/{name}",
     ]
+    for lname in _THUMB_LINUX_FONT_MAP.get(name.lower(), []):
+        for d in _THUMB_LINUX_FONT_DIRS:
+            candidates.append(f"{d}{lname}")
     for path in candidates:
         try:
             return ImageFont.truetype(path, size)

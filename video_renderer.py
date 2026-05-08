@@ -285,10 +285,10 @@ def write_ass_subtitles(captions: list, segments: list, ass_path: str) -> str:
         "ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
         "Alignment, MarginL, MarginR, MarginV, Encoding\n"
         # Caption style — large bold, black outline, bottom-center
-        "Style: Caption,Arial Black,68,&H00FFFFFF,&H000000FF,"
+        "Style: Caption,LiberationSans-Bold,68,&H00FFFFFF,&H000000FF,"
         "&H00000000,&H90000000,-1,0,0,0,100,100,1,0,1,4,2,2,60,60,100,1\n"
         # Label style — smaller, top-left, opaque dark box
-        "Style: Label,Arial,42,&H00FFFFFF,&H000000FF,"
+        "Style: Label,LiberationSans,42,&H00FFFFFF,&H000000FF,"
         "&H00111111,&HCC000000,-1,0,0,0,100,100,1,0,3,2,1,1,40,40,40,1\n\n"
         "[Events]\n"
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
@@ -356,9 +356,29 @@ _LABEL_MAP = {
 }
 
 
+# Maps Windows font filenames → Linux Liberation/DejaVu equivalents
+_LINUX_FONT_MAP = {
+    "arialbd.ttf":  ["LiberationSans-Bold.ttf",    "DejaVuSans-Bold.ttf"],
+    "arial.ttf":    ["LiberationSans-Regular.ttf", "DejaVuSans.ttf"],
+    "impact.ttf":   ["LiberationSans-Bold.ttf",    "DejaVuSans-Bold.ttf"],
+}
+_LINUX_FONT_DIRS = [
+    "/usr/share/fonts/truetype/liberation/",
+    "/usr/share/fonts/truetype/dejavu/",
+    "/usr/share/fonts/truetype/",
+]
+
+
 def _vchat_font(name: str, size: int) -> ImageFont.FreeTypeFont:
-    for path in [name, f"C:\\Windows\\Fonts\\{name}",
-                 f"/usr/share/fonts/truetype/msttcorefonts/{name}"]:
+    candidates = [
+        name,
+        f"C:\\Windows\\Fonts\\{name}",
+        f"/usr/share/fonts/truetype/msttcorefonts/{name}",
+    ]
+    for lname in _LINUX_FONT_MAP.get(name.lower(), []):
+        for d in _LINUX_FONT_DIRS:
+            candidates.append(f"{d}{lname}")
+    for path in candidates:
         try:
             return ImageFont.truetype(path, size)
         except Exception:
