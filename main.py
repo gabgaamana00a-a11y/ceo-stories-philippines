@@ -179,7 +179,7 @@ def _make_description(story_seed: str, title: str) -> str:
         f"5:00 The Aftermath\n"
         f"6:00 Who's Really in the Wrong?\n\n"
         f"🔔 NEW drama story every single day — Subscribe so you never miss one!\n"
-        f"👇 @DramaDeskChannel\n\n"
+        f"👇 @DramaDesk\n\n"
         f"{tags}"
     )
 

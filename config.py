@@ -5,7 +5,7 @@ CHANNEL_NICHE = "aita_drama"
 
 # ── YouTube upload ────────────────────────────────────────────────────────────
 UPLOAD_PRIVACY  = "public"   # public | unlisted | private
-UPLOAD_CATEGORY = "22"       # 22 = People & Blogs
+UPLOAD_CATEGORY = "24"       # 24 = Entertainment
 UPLOAD_TAGS = [
     "reddit stories", "aita", "am i the asshole", "reddit drama",
     "relationship drama", "family drama", "reddit", "storytime",
