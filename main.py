@@ -190,14 +190,32 @@ def _find_music() -> str | None:
     import requests as _requests
     music_dir = os.path.join(os.path.dirname(__file__), "music")
     os.makedirs(music_dir, exist_ok=True)
-    # Return cached track if present
-    for f in os.listdir(music_dir):
-        if f.lower().endswith((".mp3", ".wav", ".ogg", ".m4a", ".flac")):
-            return os.path.join(music_dir, f)
-    # ── 1. Try Jamendo (best free music API — cinematic/dramatic tracks) ────────
+
+    # Return random track from cached pool (variety between videos)
+    cached = [
+        os.path.join(music_dir, f)
+        for f in os.listdir(music_dir)
+        if f.lower().endswith((".mp3", ".wav", ".ogg", ".m4a", ".flac"))
+    ]
+    if len(cached) >= 3:
+        return random.choice(cached)
+
+    # ── Build a pool of 5 dramatic piano tracks via Jamendo ──────────────────
+    # All Jamendo tracks are CC-licensed (free for YouTube use).
+    # We search specifically for piano + emotional/cinematic mood tags.
+    POOL_TARGET = 5
     jamendo_id = os.getenv("JAMENDO_CLIENT_ID", "")
     if jamendo_id:
-        for tags in ["drama", "tension", "thriller", "suspense", "cinematic"]:
+        piano_searches = [
+            {"fuzzytags": "piano dramatic"},
+            {"fuzzytags": "piano cinematic"},
+            {"fuzzytags": "piano melancholic"},
+            {"fuzzytags": "piano sad emotional"},
+            {"tags": "piano"},
+        ]
+        for search_params in piano_searches:
+            if len(cached) >= POOL_TARGET:
+                break
             try:
                 resp = _requests.get(
                     "https://api.jamendo.com/v3.0/tracks/",
@@ -205,10 +223,10 @@ def _find_music() -> str | None:
                         "client_id": jamendo_id,
                         "format": "json",
                         "limit": 20,
-                        "tags": tags,
                         "orderby": "popularity_total",
                         "audioformat": "mp32",
                         "audiodlformat": "mp32",
+                        **search_params,
                     },
                     timeout=15,
                 )
@@ -216,56 +234,36 @@ def _find_music() -> str | None:
                     continue
                 tracks = resp.json().get("results", [])
                 tracks = [t for t in tracks if t.get("audiodownload_allowed") and t.get("audiodownload")]
-                if not tracks:
-                    continue
-                track = random.choice(tracks[:10])
-                track_path = os.path.join(music_dir, f"jamendo_{track['id']}.mp3")
-                r = _requests.get(track["audiodownload"], timeout=60, stream=True)
-                if r.status_code == 200:
-                    with open(track_path, "wb") as f_out:
-                        for chunk in r.iter_content(chunk_size=65536):
-                            f_out.write(chunk)
-                    if os.path.getsize(track_path) > 50_000:
-                        print(f"[music] Jamendo: '{track.get('name', tags)}' by {track.get('artist_name', '?')}")
-                        return track_path
-                    os.remove(track_path)   # too small, bad download
+                # Shuffle top 10 so each run picks something different
+                pool = tracks[:10]
+                random.shuffle(pool)
+                for track in pool:
+                    if len(cached) >= POOL_TARGET:
+                        break
+                    track_path = os.path.join(music_dir, f"jamendo_{track['id']}.mp3")
+                    if os.path.exists(track_path):
+                        cached.append(track_path)
+                        continue
+                    r = _requests.get(track["audiodownload"], timeout=60, stream=True)
+                    if r.status_code == 200:
+                        with open(track_path, "wb") as f_out:
+                            for chunk in r.iter_content(chunk_size=65536):
+                                f_out.write(chunk)
+                        if os.path.getsize(track_path) > 50_000:
+                            print(f"[music] Downloaded: '{track.get('name')}' by {track.get('artist_name')} (CC license)")
+                            cached.append(track_path)
+                        else:
+                            os.remove(track_path)
             except Exception as e:
-                print(f"[music] Jamendo failed for '{tags}': {e}")
+                print(f"[music] Jamendo search failed: {e}")
                 continue
     else:
         print("[music] No JAMENDO_CLIENT_ID — get a free key at devportal.jamendo.com")
 
-    # ── 2. Fallback: Pixabay Audio ────────────────────────────────────────────
-    api_key = os.getenv("PIXABAY_API_KEY", "")
-    if not api_key:
-        print("[music] No music found — drop an MP3 into the music/ folder")
-        return None
-    queries = ["dramatic cinematic", "tension thriller", "emotional piano strings", "suspense background"]
-    for q in queries:
-        try:
-            resp = _requests.get(
-                "https://pixabay.com/api/",
-                params={"key": api_key, "q": q, "media_type": "music", "per_page": 10},
-                timeout=15,
-            )
-            if resp.status_code != 200:
-                continue
-            hits = resp.json().get("hits", [])
-            random.shuffle(hits)
-            for hit in hits:
-                url = hit.get("previewURL", "")
-                if not url:
-                    continue
-                track_path = os.path.join(music_dir, f"drama_bg_{q.split()[0]}.mp3")
-                r = _requests.get(url, timeout=30)
-                if r.status_code == 200 and len(r.content) > 10_000:
-                    with open(track_path, "wb") as f_out:
-                        f_out.write(r.content)
-                    print(f"[music] Downloaded: {os.path.basename(track_path)}")
-                    return track_path
-        except Exception as e:
-            print(f"[music] Auto-download failed for '{q}': {e}")
-    print("[music] No background music found — add an MP3 to music/ folder")
+    if cached:
+        return random.choice(cached)
+
+    print("[music] No music found — drop a dramatic piano MP3 into the music/ folder")
     return None
 
 
