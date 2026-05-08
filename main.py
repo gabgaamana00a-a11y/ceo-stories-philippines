@@ -198,7 +198,7 @@ def _find_music() -> str | None:
     # ── 1. Try Jamendo (best free music API — cinematic/dramatic tracks) ────────
     jamendo_id = os.getenv("JAMENDO_CLIENT_ID", "")
     if jamendo_id:
-        for tags in ["cinematic dramatic", "tension thriller", "emotional piano", "suspense ambient", "dramatic orchestral"]:
+        for tags in ["drama", "tension", "thriller", "suspense", "cinematic"]:
             try:
                 resp = _requests.get(
                     "https://api.jamendo.com/v3.0/tracks/",
@@ -207,6 +207,7 @@ def _find_music() -> str | None:
                         "format": "json",
                         "limit": 20,
                         "tags": tags,
+                        "orderby": "popularity_total",
                         "audioformat": "mp32",
                         "audiodlformat": "mp32",
                     },

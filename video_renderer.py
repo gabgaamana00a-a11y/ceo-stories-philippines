@@ -412,8 +412,8 @@ def _make_card_frame(seg: dict, W: int = 1920, H: int = 1080) -> Image.Image:
     draw.text((tx, y), "r/AmItheAsshole", fill=(255, 95, 35), font=f_sub)
     y += 36
     spk  = seg.get("speaker", "NARRATOR")
-    meta = ("u/throwaway_aita_user  \u2022  14 hours ago  \u2022  \U0001f3c6 Best of r/AITA"
-            if spk in ("OP", "OP_MALE") else "\U0001f399\ufe0f  Narrator")
+    meta = ("u/throwaway_aita_user  \u2022  14 hours ago  \u2022  Top Post r/AITA"
+            if spk in ("OP", "OP_MALE") else "Narrator")
     draw.text((tx, y), meta, fill=(128, 120, 128), font=f_meta)
     y += 32
     draw.rectangle([CX + 18, y, CX + CW - 18, y + 1], fill=(55, 50, 55))
@@ -433,7 +433,7 @@ def _make_card_frame(seg: dict, W: int = 1920, H: int = 1080) -> Image.Image:
     # Footer (mock engagement stats)
     fy = CY + CH - 42
     draw.rectangle([CX + 18, fy - 6, CX + CW - 18, fy - 5], fill=(50, 46, 50))
-    draw.text((tx, fy), "\u25b2  24.7k    \U0001f4ac 3.2k comments    Share    Save",
+    draw.text((tx, fy), "\u25b2  24.7k    \u25cf  3.2k Comments    Share    Save",
               fill=(120, 115, 120), font=f_foot)
     return img
 
@@ -573,7 +573,7 @@ def render_chat_video(
     if has_music:
         afilt = (
             "[1:a]volume=1.0[speech];"
-            f"[2:a]volume=0.07,afade=t=in:st=0:d=3,"
+            f"[2:a]volume=0.13,afade=t=in:st=0:d=3,"
             f"afade=t=out:st={fade_out:.1f}:d=4[music];"
             "[speech][music]amix=inputs=2:dropout_transition=3[aout]"
         )
