@@ -11,6 +11,8 @@ reproduce post body text verbatim — the AI generates a fully original
 dramatised story inspired by the seed.
 """
 
+import json
+import os
 import random
 import re
 import requests
@@ -63,15 +65,49 @@ _HOOK_WORDS = [
 ]
 
 
+_USED_SEEDS_FILE = os.path.join(os.path.dirname(__file__), "used_topics.json")
+
+
+def _load_used_seeds() -> set:
+    try:
+        with open(_USED_SEEDS_FILE, encoding="utf-8") as f:
+            return set(json.load(f))
+    except Exception:
+        return set()
+
+
+def _save_used_seed(seed: str) -> None:
+    used = _load_used_seeds()
+    used.add(seed)
+    with open(_USED_SEEDS_FILE, "w", encoding="utf-8") as f:
+        json.dump(sorted(used), f, indent=2)
+
+
+def _pick_unused_fallback() -> str:
+    """Pick a fallback seed not yet used. Resets the list when all are exhausted."""
+    used = _load_used_seeds()
+    available = [s for s in FALLBACK_SEEDS if s not in used]
+    if not available:
+        # All seeds used — reset and start over
+        print("[trending] All fallback seeds used — resetting used list")
+        available = list(FALLBACK_SEEDS)
+        with open(_USED_SEEDS_FILE, "w", encoding="utf-8") as f:
+            json.dump([], f)
+    seed = random.choice(available)
+    _save_used_seed(seed)
+    return seed
+
+
 def get_trending_drama_seed() -> str:
     """Return a trending drama story seed from Reddit, or a curated fallback."""
     shuffled = random.sample(DRAMA_SUBREDDITS, min(4, len(DRAMA_SUBREDDITS)))
     for subreddit in shuffled:
         seed = _fetch_from_reddit(subreddit)
         if seed:
+            _save_used_seed(seed)
             return seed
     print("[trending] Reddit unavailable — using curated fallback seed")
-    return random.choice(FALLBACK_SEEDS)
+    return _pick_unused_fallback()
 
 
 def _fetch_from_reddit(subreddit: str) -> str | None:

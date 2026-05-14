@@ -97,7 +97,17 @@ jobs:
 
           python main.py $ARGS
 
-      # ── 7. Save artifact ─────────────────────────────────────────────────────
+      # ── 7. Persist used seed list ────────────────────────────────────────────────────
+      - name: Commit used_topics.json
+        if: always()
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add used_topics.json || true
+          git diff --cached --quiet || git commit -m "chore: update used_topics.json [skip ci]"
+          git push
+
+      # ── 8. Save artifact ─────────────────────────────────────────────────────────────
       - name: Upload output artifact
         uses: actions/upload-artifact@v4
         if: always()
