@@ -8,12 +8,10 @@ tiktok_cookies.json
 # Output / generated files
 output/
 logs/
-music/
 models/
 *.mp4
-*.mp3
-*.wav
 *.png
+music/jamendo_*.mp3
 
 # Python
 __pycache__/
