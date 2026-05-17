@@ -5,12 +5,20 @@ CHANNEL_NICHE = "aita_drama"
 
 # ── YouTube upload ────────────────────────────────────────────────────────────
 UPLOAD_PRIVACY  = "public"   # public | unlisted | private
-UPLOAD_CATEGORY = "24"       # 24 = Entertainment
+UPLOAD_CATEGORY = "22"       # 22 = People & Blogs (best for AITA narrator format)
 UPLOAD_TAGS = [
-    "reddit stories", "aita", "am i the asshole", "reddit drama",
-    "relationship drama", "family drama", "reddit", "storytime",
-    "drama channel", "reddit relationship advice", "entitled people",
-    "aita reddit", "relationship advice", "cheating story", "true story",
+    # Exact-match high-volume searches
+    "aita", "am i the asshole", "am i wrong", "reddit aita", "aita reddit",
+    "reddit stories", "reddit drama", "reddit story time", "best reddit stories",
+    # Long-tail relationship terms
+    "relationship advice", "relationship drama", "family drama",
+    "mother in law drama", "cheating story", "toxic relationship story",
+    # Format/channel terms
+    "storytime", "true story", "drama channel", "drama desk",
+    "reddit reading", "reddit narration", "aita stories 2025",
+    # Discovery terms
+    "entitled people", "viral reddit", "shocking story",
+    "reddit update", "unbelievable story", "real story",
 ]
 
 # ── Video format — 16:9 landscape for YouTube long-form ──────────────────────

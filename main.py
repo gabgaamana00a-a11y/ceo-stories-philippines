@@ -151,6 +151,40 @@ _GENERIC_TITLES = [
 
 
 def _make_title(story_seed: str) -> str:
+    """Generate a unique viral title via LLM, fall back to keyword pools."""
+    api_key = os.getenv("OPENROUTER_API_KEY", "")
+    if api_key:
+        try:
+            import requests as _req
+            prompt = (
+                f'Generate ONE YouTube title for a viral AITA/Reddit drama video about this story:\n"{story_seed}"\n\n'
+                "Rules:\n"
+                "- 60-80 characters total (fits mobile without truncation)\n"
+                "- Front-load the emotional hook — don't start with 'AITA'\n"
+                "- Include exactly ONE emoji (😱 💀 😤 🤯 or 🔥)\n"
+                "- End with | AITA or | Reddit Drama\n"
+                "- Use power words: EXPOSED, FINALLY, NOBODY, EVERYONE, TRUTH, SECRET, SHOCKED\n"
+                "- Output ONLY the title, nothing else, no quotes"
+            )
+            resp = _req.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                json={
+                    "model": "google/gemini-2.0-flash-lite-001",
+                    "messages": [{"role": "user", "content": prompt}],
+                    "max_tokens": 80,
+                    "temperature": 1.0,
+                },
+                timeout=15,
+            )
+            if resp.status_code == 200:
+                title = resp.json()["choices"][0]["message"]["content"].strip().strip('"').strip("'")
+                if 45 <= len(title) <= 100:
+                    print(f"[title] LLM: {title}")
+                    return title
+        except Exception as e:
+            print(f"[title] LLM failed, using pool: {e}")
+    # fallback to keyword pools
     s = story_seed.lower()
     for keywords, pool in _TITLE_POOLS:
         if any(k in s for k in keywords):
@@ -159,28 +193,37 @@ def _make_title(story_seed: str) -> str:
 
 
 def _make_description(story_seed: str, title: str) -> str:
-    tags = " ".join([
-        "#AITA", "#RedditDrama", "#DramaDesk", "#RelationshipAdvice",
-        "#FamilyDrama", "#Reddit", "#StoryTime", "#AmITheAsshole",
-        "#Relationships", "#TrueStory", "#EntitledPeople", "#RedditStories",
-        "#AITAReddit", "#DramaChannel", "#DailyDrama", "#RedditReading",
-    ])
+    # First 2 lines show before "Show more" — they must hook and include keywords
+    hook = story_seed[:150] if len(story_seed) > 150 else story_seed
+    hashtags = (
+        "#AITA #AmITheAsshole #RedditDrama #RedditStories #RelationshipAdvice "
+        "#FamilyDrama #DramaDesk #StoryTime #TrueStory #EntitledPeople "
+        "#AITAReddit #RelationshipDrama #DailyDrama #RedditReading "
+        "#DramaChannel #Reddit #aita2024 #redditstorytime #amiwrong "
+        "#toxicrelationship #redditrelationship #viralstory"
+    )
     return (
-        f"{title}\n\n"
-        f"Today on Drama Desk, we're diving into a story that has EVERYONE divided:\n"
-        f'"{story_seed}"\n\n'
-        f"Drop a ❤️ if you're on OP's side. Drop a 💀 if you think they went too far.\n"
-        f"Comment your verdict — I read every single one.\n\n"
+        f"⚡ {hook}\n"
+        f"Drop your verdict below — ❤️ if OP was RIGHT, 💀 if they went TOO FAR.\n\n"
+        f"Welcome to Drama Desk — real stories, real reactions, real drama. "
+        f"Every day we cover the most shocking AITA and Reddit drama stories "
+        f"that have the internet completely divided. Watch till the end — "
+        f"I read the top comments in the NEXT video.\n\n"
+        f"👇 VOTE:\n"
+        f"❤️ = OP was RIGHT\n"
+        f"💀 = OP went too far\n"
+        f"🤔 = Everyone's wrong\n\n"
         f"⏱️ CHAPTERS\n"
         f"0:00 The Most Shocking Part First\n"
-        f"0:30 The Full Story Begins\n"
-        f"2:00 Things Start Going Wrong\n"
-        f"3:30 The Big Confrontation\n"
+        f"0:30 The Full Story\n"
+        f"2:00 Where It Goes Wrong\n"
+        f"3:30 The Confrontation\n"
         f"5:00 The Aftermath\n"
-        f"6:00 Who's Really in the Wrong?\n\n"
-        f"🔔 NEW drama story every single day — Subscribe so you never miss one!\n"
-        f"👇 @DramaDesk\n\n"
-        f"{tags}"
+        f"6:00 Who's REALLY in the Wrong?\n\n"
+        f"🔔 Subscribe + hit the bell — new story EVERY day!\n"
+        f"👍 Like if you stayed till the end\n"
+        f"📢 Share with someone who lives for drama\n\n"
+        f"{hashtags}"
     )
 
 
@@ -315,15 +358,17 @@ def _upload_youtube(video_path: str, title: str, description: str, thumb_path: s
         youtube = build("youtube", "v3", credentials=creds)
         body = {
             "snippet": {
-                "title":           title[:100],
-                "description":     description[:5000],
-                "tags":            UPLOAD_TAGS,
-                "categoryId":      UPLOAD_CATEGORY,
-                "defaultLanguage": "en",
+                "title":                title[:100],
+                "description":          description[:5000],
+                "tags":                 UPLOAD_TAGS,
+                "categoryId":           UPLOAD_CATEGORY,
+                "defaultLanguage":      "en",
+                "defaultAudioLanguage": "en",
             },
             "status": {
                 "privacyStatus":           UPLOAD_PRIVACY,
                 "selfDeclaredMadeForKids": False,
+                "madeForKids":             False,
             },
         }
         media = MediaFileUpload(video_path, chunksize=-1, resumable=True, mimetype="video/mp4")
