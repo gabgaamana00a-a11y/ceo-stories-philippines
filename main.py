@@ -397,7 +397,6 @@ def create_drama_video(
     # ── 4. Video render ───────────────────────────────────────────────────────
     print("\n[4/6] Rendering video...")
     scene_tags = _extract_scene_tags(script)
-    music_path = _find_music()
     video_path = os.path.join(output_dir, "drama_video.mp4")
     render_drama_video(
         audio_path=tts["audio_path"],
@@ -405,7 +404,7 @@ def create_drama_video(
         segments=tts["segments"],
         output_path=video_path,
         scene_tags=scene_tags,
-        music_path=music_path,
+        music_path=None,
     )
 
     # ── 5. Thumbnail ──────────────────────────────────────────────────────────
