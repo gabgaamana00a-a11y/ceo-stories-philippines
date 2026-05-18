@@ -100,9 +100,13 @@ jobs:
       # ── 7. Persist used seed list ────────────────────────────────────────────────────
       - name: Commit used_topics.json
         if: always()
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git
           git add used_topics.json || true
           git diff --cached --quiet || git commit -m "chore: update used_topics.json [skip ci]"
           git push
