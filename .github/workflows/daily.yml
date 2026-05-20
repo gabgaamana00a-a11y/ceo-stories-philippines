@@ -3,8 +3,8 @@ name: Daily Drama Video
 # ── Triggers ──────────────────────────────────────────────────────────────────
 on:
   schedule:
-    # 9 AM EST = 2 PM UTC — posts when US audience is waking up
-    - cron: "0 14 * * *"
+    # Target 2 PM UTC actual — schedule 2 hrs early to compensate for GitHub Actions runner delay
+    - cron: "0 12 * * *"
   workflow_dispatch:
     inputs:
       story_seed:
