@@ -310,6 +310,25 @@ def _find_music() -> str | None:
     return None
 
 
+# ── Telegram notifier ───────────────────────────────────────────────────────────
+
+def _notify_telegram(message: str) -> None:
+    """Send a Telegram notification. Silently skips if env vars are missing."""
+    token   = os.getenv("TELEGRAM_BOT_TOKEN")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID")
+    if not token or not chat_id:
+        return
+    import urllib.request
+    url  = f"https://api.telegram.org/bot{token}/sendMessage"
+    data = json.dumps({"chat_id": chat_id, "text": message, "parse_mode": "HTML"}).encode()
+    req  = urllib.request.Request(url, data=data, headers={"Content-Type": "application/json"})
+    try:
+        urllib.request.urlopen(req, timeout=10)
+        print("[telegram] Notification sent")
+    except Exception as e:
+        print(f"[telegram] Notification failed: {e}")
+
+
 # ── YouTube uploader ──────────────────────────────────────────────────────────
 
 def _upload_youtube(video_path: str, title: str, description: str, thumb_path: str = None) -> str | None:
@@ -505,8 +524,21 @@ if __name__ == "__main__":
     parser.add_argument("--output",    type=str,  default=None, help="Output directory")
     args = parser.parse_args()
 
-    create_drama_video(
-        story_seed=args.seed,
-        output_dir=args.output,
-        upload=not args.no_upload,
-    )
+    try:
+        result = create_drama_video(
+            story_seed=args.seed,
+            output_dir=args.output,
+            upload=not args.no_upload,
+        )
+        yt_url = result.get("youtube_url")
+        if yt_url:
+            _notify_telegram(
+                f"\u2705 <b>Drama video uploaded!</b>\n\n"
+                f"\U0001f3ac {result['title']}\n"
+                f"\U0001f517 {yt_url}"
+            )
+        elif not args.no_upload:
+            _notify_telegram("\u26a0\ufe0f <b>Video rendered but YouTube upload failed.</b>\nCheck Actions logs for details.")
+    except Exception as exc:
+        _notify_telegram(f"\u274c <b>Drama pipeline failed:</b>\n\n<code>{exc}</code>")
+        raise
