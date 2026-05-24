@@ -80,10 +80,12 @@ jobs:
       # ── 6. Run pipeline ──────────────────────────────────────────────────────
       - name: Generate drama video
         env:
-          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
-          PEXELS_API_KEY:     ${{ secrets.PEXELS_API_KEY }}
-          PIXABAY_API_KEY:    ${{ secrets.PIXABAY_API_KEY }}
-          JAMENDO_CLIENT_ID:  ${{ secrets.JAMENDO_CLIENT_ID }}
+          OPENROUTER_API_KEY:   ${{ secrets.OPENROUTER_API_KEY }}
+          PEXELS_API_KEY:       ${{ secrets.PEXELS_API_KEY }}
+          PIXABAY_API_KEY:      ${{ secrets.PIXABAY_API_KEY }}
+          JAMENDO_CLIENT_ID:    ${{ secrets.JAMENDO_CLIENT_ID }}
+          TELEGRAM_BOT_TOKEN:   ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:     ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           SEED="${{ github.event.inputs.story_seed }}"
           UPLOAD="${{ github.event.inputs.upload }}"
