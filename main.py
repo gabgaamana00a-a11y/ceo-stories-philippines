@@ -530,15 +530,26 @@ if __name__ == "__main__":
             output_dir=args.output,
             upload=not args.no_upload,
         )
+        repo = os.getenv("GITHUB_REPOSITORY", "local")
         yt_url = result.get("youtube_url")
         if yt_url:
             _notify_telegram(
                 f"\u2705 <b>Drama video uploaded!</b>\n\n"
                 f"\U0001f3ac {result['title']}\n"
-                f"\U0001f517 {yt_url}"
+                f"\U0001f517 {yt_url}\n\n"
+                f"\U0001f4e6 Repo: {repo}"
             )
         elif not args.no_upload:
-            _notify_telegram("\u26a0\ufe0f <b>Video rendered but YouTube upload failed.</b>\nCheck Actions logs for details.")
+            _notify_telegram(
+                f"\u26a0\ufe0f <b>Video rendered but YouTube upload failed.</b>\n"
+                f"Check Actions logs for details.\n\n"
+                f"\U0001f4e6 Repo: {repo}"
+            )
     except Exception as exc:
-        _notify_telegram(f"\u274c <b>Drama pipeline failed:</b>\n\n<code>{exc}</code>")
+        repo = os.getenv("GITHUB_REPOSITORY", "local")
+        _notify_telegram(
+            f"\u274c <b>Drama pipeline failed:</b>\n\n"
+            f"<code>{exc}</code>\n\n"
+            f"\U0001f4e6 Repo: {repo}"
+        )
         raise
