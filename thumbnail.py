@@ -457,14 +457,16 @@ def _draw_bottom_bar(draw: ImageDraw.Draw, W: int, H: int) -> None:
 # ── Font helpers ──────────────────────────────────────────────────────────────
 
 _LINUX_FONT_MAP = {
-    "impact.ttf":  ["LiberationSans-Bold.ttf", "DejaVuSans-Bold.ttf"],
-    "arialbd.ttf": ["LiberationSans-Bold.ttf", "DejaVuSans-Bold.ttf"],
-    "arial.ttf":   ["LiberationSans-Regular.ttf", "DejaVuSans.ttf"],
+    "impact.ttf":  ["LiberationSans-Bold.ttf", "DejaVuSans-Bold.ttf",   "NotoSans-Bold.ttf"],
+    "arialbd.ttf": ["LiberationSans-Bold.ttf", "DejaVuSans-Bold.ttf",   "NotoSans-Bold.ttf"],
+    "arial.ttf":   ["LiberationSans-Regular.ttf", "DejaVuSans.ttf",     "NotoSans-Regular.ttf"],
 }
 _LINUX_DIRS = [
     "/usr/share/fonts/truetype/liberation/",
     "/usr/share/fonts/truetype/dejavu/",
+    "/usr/share/fonts/truetype/noto/",
     "/usr/share/fonts/truetype/",
+    "/usr/share/fonts/",
 ]
 
 

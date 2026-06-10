@@ -359,14 +359,16 @@ _LABEL_MAP = {
 
 # Maps Windows font filenames → Linux Liberation/DejaVu equivalents
 _LINUX_FONT_MAP = {
-    "arialbd.ttf":  ["LiberationSans-Bold.ttf",    "DejaVuSans-Bold.ttf"],
-    "arial.ttf":    ["LiberationSans-Regular.ttf", "DejaVuSans.ttf"],
-    "impact.ttf":   ["LiberationSans-Bold.ttf",    "DejaVuSans-Bold.ttf"],
+    "arialbd.ttf":  ["LiberationSans-Bold.ttf",    "DejaVuSans-Bold.ttf",   "NotoSans-Bold.ttf"],
+    "arial.ttf":    ["LiberationSans-Regular.ttf", "DejaVuSans.ttf",        "NotoSans-Regular.ttf"],
+    "impact.ttf":   ["LiberationSans-Bold.ttf",    "DejaVuSans-Bold.ttf",   "NotoSans-Bold.ttf"],
 }
 _LINUX_FONT_DIRS = [
     "/usr/share/fonts/truetype/liberation/",
     "/usr/share/fonts/truetype/dejavu/",
+    "/usr/share/fonts/truetype/noto/",
     "/usr/share/fonts/truetype/",
+    "/usr/share/fonts/",
 ]
 
 

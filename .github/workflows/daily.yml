@@ -46,7 +46,8 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y ffmpeg libfontconfig1 espeak-ng fonts-liberation fonts-dejavu-core
+          sudo apt-get install -y ffmpeg libfontconfig1 espeak-ng \
+            fonts-liberation fonts-dejavu-core fonts-noto-core
 
       # ── 3b. Cache Kokoro model weights (~115 MB total, avoid re-downloading daily) ─
       - name: Cache Kokoro model
