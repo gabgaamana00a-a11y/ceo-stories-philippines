@@ -3,8 +3,9 @@ name: Daily Kwentong Multo Video
 # ── Triggers ──────────────────────────────────────────────────────────────────
 on:
   schedule:
-    # Target 2 PM UTC actual — schedule 2 hrs early to compensate for GitHub Actions runner delay
-    - cron: "0 12 * * *"
+    # 4 PM Philippine Time (PHT = UTC+8) = 08:00 UTC
+    # Schedule 1 hr early (07:00 UTC) to compensate for GitHub Actions runner delay
+    - cron: "0 7 * * *"
   workflow_dispatch:
     inputs:
       story_seed:

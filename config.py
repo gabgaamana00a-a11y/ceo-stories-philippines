@@ -97,5 +97,5 @@ HORROR_CATEGORIES = [
 ]
 
 # ── Schedule (Philippine Standard Time UTC+8 = prime time 8-9 PM PST) ────────
-SCHEDULE_HOUR   = 12   # 12 PM UTC = 8 PM PST
+SCHEDULE_HOUR   = 8    # 08:00 UTC = 4:00 PM PHT (Philippine Time, UTC+8)
 SCHEDULE_MINUTE = 0

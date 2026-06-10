@@ -25,7 +25,7 @@ def _default_config():
                 "id": "slot_morning",
                 "niche": "math_quiz",
                 "count": 1,
-                "hour": 9,
+                "hour": 8,   # 08:00 UTC = 4:00 PM PHT
                 "minute": 0,
                 "upload": True,
                 "active": True,
