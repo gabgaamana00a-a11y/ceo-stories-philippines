@@ -21,7 +21,7 @@ on:
 
 # ── Permissions ───────────────────────────────────────────────────────────────
 permissions:
-  contents: read
+  contents: write
 
 # ── Job ───────────────────────────────────────────────────────────────────────
 jobs:
@@ -77,8 +77,12 @@ jobs:
           YOUTUBE_TOKEN_JSON:       ${{ secrets.YOUTUBE_TOKEN_JSON }}
           YOUTUBE_CREDENTIALS_JSON: ${{ secrets.YOUTUBE_CREDENTIALS_JSON }}
         run: |
-          echo "$YOUTUBE_TOKEN_JSON"       > token.json
-          echo "$YOUTUBE_CREDENTIALS_JSON" > credentials.json
+          # Use printf to avoid bash echo mangling JSON special characters
+          printf '%s' "$YOUTUBE_TOKEN_JSON"       > token.json
+          printf '%s' "$YOUTUBE_CREDENTIALS_JSON" > credentials.json
+          # Validate both files are valid JSON before proceeding
+          python -c "import json,sys; json.load(open('token.json')); print('token.json OK')"
+          python -c "import json,sys; json.load(open('credentials.json')); print('credentials.json OK')"
 
       # ── 6. Run pipeline ──────────────────────────────────────────────────────
       - name: Generate horror story video
