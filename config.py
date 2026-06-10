@@ -10,16 +10,16 @@ UPLOAD_TAGS = [
     # High-volume Tagalog horror searches
     "kwentong multo", "multo", "horror story tagalog", "kwentong horror",
     "tagalog horror stories", "kwentong aswang", "aswang story",
-    "kwentong totoo", "true horror story philippines", "pinoy horror",
+    "kwentong totoo", "true horror story", "pinoy horror",
     # Folklore creatures
-    "aswang", "manananggal", "kapre", "tikbalang", "duwende", "sigbin",
+    "aswang", "manananggal", "kapre", "tikbalang", "duwende",
     "engkanto", "white lady", "multo sa paaralan", "multo sa ospital",
     # Format/discovery terms
     "horror stories", "kwentong sindak", "nakakatakot na kwento",
-    "pinoy scary stories", "philippine folklore", "urban legend philippines",
-    "ofw horror story", "probinsya horror", "kwentong multo 2025",
+    "pinoy scary stories", "philippine folklore", "urban legend",
+    "ofw horror story", "probinsya horror",
     # Engagement terms
-    "nakakatakot", "totoo ba ito", "true story", "pinoy horror channel",
+    "nakakatakot", "true story", "pinoy horror channel",
 ]
 
 # ── Video format — 16:9 landscape for YouTube long-form ──────────────────────
