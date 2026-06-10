@@ -169,7 +169,7 @@ Tapusin sa tagapagsalaysay na nag-iimbitang mag-comment ang mga manonood."""
 
     models_to_try = [
         "google/gemini-2.5-flash",
-        "google/gemini-2.0-flash-001",
+        "google/gemini-2.5-flash-lite",
         "anthropic/claude-3-haiku",
     ]
 
