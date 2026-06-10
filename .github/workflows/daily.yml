@@ -63,7 +63,8 @@ jobs:
       # ── 5. Write secret files ────────────────────────────────────────────────
       #
       # REQUIRED GitHub Secrets:
-      #   OPENROUTER_API_KEY        — OpenRouter key for Tagalog horror script generation
+      #   OPENROUTER_API_KEY        — Primary OpenRouter key (required)
+      #   OPENROUTER_API_KEY_2..10  — Additional keys for rotation (optional)
       #   PEXELS_API_KEY            — Pexels key for thumbnail face photos
       #   YOUTUBE_TOKEN_JSON        — Contents of your token.json (OAuth token)
       #   YOUTUBE_CREDENTIALS_JSON  — Contents of your credentials.json (OAuth client)
@@ -87,10 +88,19 @@ jobs:
       # ── 6. Run pipeline ──────────────────────────────────────────────────────
       - name: Generate horror story video
         env:
-          OPENROUTER_API_KEY:   ${{ secrets.OPENROUTER_API_KEY }}
-          PEXELS_API_KEY:       ${{ secrets.PEXELS_API_KEY }}
-          TELEGRAM_BOT_TOKEN:   ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID:     ${{ secrets.TELEGRAM_CHAT_ID }}
+          OPENROUTER_API_KEY:    ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_API_KEY_2:  ${{ secrets.OPENROUTER_API_KEY_2 }}
+          OPENROUTER_API_KEY_3:  ${{ secrets.OPENROUTER_API_KEY_3 }}
+          OPENROUTER_API_KEY_4:  ${{ secrets.OPENROUTER_API_KEY_4 }}
+          OPENROUTER_API_KEY_5:  ${{ secrets.OPENROUTER_API_KEY_5 }}
+          OPENROUTER_API_KEY_6:  ${{ secrets.OPENROUTER_API_KEY_6 }}
+          OPENROUTER_API_KEY_7:  ${{ secrets.OPENROUTER_API_KEY_7 }}
+          OPENROUTER_API_KEY_8:  ${{ secrets.OPENROUTER_API_KEY_8 }}
+          OPENROUTER_API_KEY_9:  ${{ secrets.OPENROUTER_API_KEY_9 }}
+          OPENROUTER_API_KEY_10: ${{ secrets.OPENROUTER_API_KEY_10 }}
+          PEXELS_API_KEY:        ${{ secrets.PEXELS_API_KEY }}
+          TELEGRAM_BOT_TOKEN:    ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:      ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
           SEED="${{ github.event.inputs.story_seed }}"
           UPLOAD="${{ github.event.inputs.upload }}"

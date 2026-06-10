@@ -131,42 +131,51 @@ _GENERIC_TITLES = [
 
 def _make_title(story_seed: str) -> str:
     """Generate a unique viral Tagalog horror title via LLM, fall back to keyword pools."""
-    api_key = os.getenv("OPENROUTER_API_KEY", "")
-    if api_key:
-        for _attempt in range(3):
-            try:
-                import requests as _req
-                prompt = (
-                    f'Gumawa ng ISANG YouTube title para sa Tagalog horror video tungkol sa kwentong ito:\n"{story_seed}"\n\n'
-                    "Mga Patakaran:\n"
-                    "- 50-80 character ang kabuuan\n"
-                    "- Tagalog ang salita (Filipino)\n"
-                    "- Magsimula sa nakakatakot na hook — tulad ng: Nakita Ko, Natuklasan Ko, Hindi Ko Malilimutan\n"
-                    "- Kasama ang ISANG emoji (😱 👻 😨 😐 o 🔊)\n"
-                    "- Tapusin sa | Kwentong Multo o | Horror Tagalog\n"
-                    "- I-output LAMANG ang title, walang iba, walang quotes"
-                )
-                resp = _req.post(
-                    "https://openrouter.ai/api/v1/chat/completions",
-                    headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                    json={
-                        "model": "google/gemini-2.5-flash",
-                        "messages": [{"role": "user", "content": prompt}],
-                        "max_tokens": 80,
-                        "temperature": 1.0,
-                    },
-                    timeout=15,
-                )
-                if resp.status_code == 200:
-                    title = resp.json()["choices"][0]["message"]["content"].strip().strip('"').strip("'")
-                    if 45 <= len(title) <= 100 and not is_title_used(title):
-                        print(f"[title] LLM (attempt {_attempt+1}): {title}")
-                        return title
-                    elif is_title_used(title):
-                        print(f"[title] Title already used, retrying...")
-            except Exception as e:
-                print(f"[title] LLM failed, using pool: {e}")
-                break
+    from config import get_openrouter_keys
+    api_keys = get_openrouter_keys()
+    if api_keys:
+        prompt = (
+            f'Gumawa ng ISANG YouTube title para sa Tagalog horror video tungkol sa kwentong ito:\n"{story_seed}"\n\n'
+            "Mga Patakaran:\n"
+            "- 50-80 character ang kabuuan\n"
+            "- Tagalog ang salita (Filipino)\n"
+            "- Magsimula sa nakakatakot na hook — tulad ng: Nakita Ko, Natuklasan Ko, Hindi Ko Malilimutan\n"
+            "- Kasama ang ISANG emoji (😱 👻 😨 😐 o 🔊)\n"
+            "- Tapusin sa | Kwentong Multo o | Horror Tagalog\n"
+            "- I-output LAMANG ang title, walang iba, walang quotes"
+        )
+        for key_idx, api_key in enumerate(api_keys):
+            key_label = f"key{key_idx + 1}"
+            for _attempt in range(3):
+                try:
+                    import requests as _req
+                    resp = _req.post(
+                        "https://openrouter.ai/api/v1/chat/completions",
+                        headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                        json={
+                            "model": "google/gemini-2.5-flash",
+                            "messages": [{"role": "user", "content": prompt}],
+                            "max_tokens": 80,
+                            "temperature": 1.0,
+                        },
+                        timeout=15,
+                    )
+                    if resp.status_code in (401, 402, 403):
+                        print(f"[title] {key_label} auth/credit error — trying next key")
+                        break
+                    if resp.status_code == 429:
+                        print(f"[title] {key_label} rate limited — trying next key")
+                        break
+                    if resp.status_code == 200:
+                        title = resp.json()["choices"][0]["message"]["content"].strip().strip('"').strip("'")
+                        if 45 <= len(title) <= 100 and not is_title_used(title):
+                            print(f"[title] LLM {key_label} (attempt {_attempt+1}): {title}")
+                            return title
+                        elif is_title_used(title):
+                            print(f"[title] Title already used, retrying...")
+                except Exception as e:
+                    print(f"[title] {key_label} failed, using pool: {e}")
+                    break
     # fallback to keyword pools (pick unused variant)
     s = story_seed.lower()
     for keywords, pool in _TITLE_POOLS:

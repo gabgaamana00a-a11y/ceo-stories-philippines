@@ -152,8 +152,9 @@ def _normalize_speaker_tags(script: str) -> str:
 
 def generate_drama_script(story_seed: str) -> str:
     """Generate a full multi-voice Tagalog horror script from a story seed."""
-    api_key = os.getenv("OPENROUTER_API_KEY", "")
-    if not api_key:
+    from config import get_openrouter_keys
+    api_keys = get_openrouter_keys()
+    if not api_keys:
         print("[script] No OPENROUTER_API_KEY — using fallback script")
         return _fallback_script(story_seed)
 
@@ -173,61 +174,72 @@ Tapusin sa tagapagsalaysay na nag-iimbitang mag-comment ang mga manonood."""
         "anthropic/claude-3-haiku",
     ]
 
-    for model in models_to_try:
-        for attempt in range(2):
-            try:
-                resp = requests.post(
-                    "https://openrouter.ai/api/v1/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {api_key}",
-                        "Content-Type": "application/json",
-                        "HTTP-Referer": "https://youtube.com/@KwentongMulto",
-                        "X-Title": "Kwentong Multo",
-                    },
-                    json={
-                        "model": model,
-                        "messages": [
-                            {"role": "system", "content": _SYSTEM_PROMPT},
-                            {"role": "user",   "content": user_prompt},
-                        ],
-                        "max_tokens": 2500,
-                        "temperature": 0.85,
-                    },
-                    timeout=90,
-                )
+    for key_idx, api_key in enumerate(api_keys):
+        key_label = f"key{key_idx + 1}"
+        for model in models_to_try:
+            for attempt in range(2):
+                try:
+                    resp = requests.post(
+                        "https://openrouter.ai/api/v1/chat/completions",
+                        headers={
+                            "Authorization": f"Bearer {api_key}",
+                            "Content-Type": "application/json",
+                            "HTTP-Referer": "https://youtube.com/@KwentongMulto",
+                            "X-Title": "Kwentong Multo",
+                        },
+                        json={
+                            "model": model,
+                            "messages": [
+                                {"role": "system", "content": _SYSTEM_PROMPT},
+                                {"role": "user",   "content": user_prompt},
+                            ],
+                            "max_tokens": 2500,
+                            "temperature": 0.85,
+                        },
+                        timeout=90,
+                    )
 
-                if resp.status_code == 429:
-                    if attempt == 0:
-                        print(f"[script] Rate limited on {model}, retrying in 20s...")
-                        time.sleep(20)
-                        continue
-                    print(f"[script] Rate limited — trying next model")
+                    if resp.status_code in (401, 402, 403):
+                        print(f"[script] {key_label} auth/credit error ({resp.status_code}) — trying next key")
+                        break  # break model loop → next key
+
+                    if resp.status_code == 429:
+                        if attempt == 0:
+                            print(f"[script] {key_label} rate limited on {model}, retrying in 20s...")
+                            time.sleep(20)
+                            continue
+                        print(f"[script] {key_label} rate limited — trying next model")
+                        break
+
+                    if resp.status_code != 200:
+                        print(f"[script] {key_label} {model} error {resp.status_code}: {resp.text[:120]}")
+                        break
+
+                    script = resp.json()["choices"][0]["message"]["content"].strip()
+                    word_count = len(script.split())
+                    print(f"[script] Generated via {key_label}/{model}: {word_count} words")
+
+                    if word_count < 350:
+                        print("[script] Too short — trying next model")
+                        break
+
+                    if "[NARRATOR]" not in script and "[OP]" not in script:
+                        print("[script] Missing speaker tags — trying next model")
+                        break
+
+                    script = _normalize_speaker_tags(script)
+                    return script
+
+                except Exception as e:
+                    print(f"[script] {key_label} {model} exception: {e}")
                     break
-
-                if resp.status_code != 200:
-                    print(f"[script] {model} error {resp.status_code}: {resp.text[:120]}")
-                    break
-
-                script = resp.json()["choices"][0]["message"]["content"].strip()
-                word_count = len(script.split())
-                print(f"[script] Generated via {model}: {word_count} words")
-
-                if word_count < 350:
-                    print("[script] Too short — trying next model")
-                    break
-
-                if "[NARRATOR]" not in script and "[OP]" not in script:
-                    print("[script] Missing speaker tags — trying next model")
-                    break
-
-                script = _normalize_speaker_tags(script)
-                return script
-
-            except Exception as e:
-                print(f"[script] {model} exception: {e}")
+            else:
+                continue  # both attempts used up without a 401/429 break — move to next model
+            # A hard break (auth error) — skip remaining models for this key
+            if resp.status_code in (401, 402, 403):
                 break
 
-    print("[script] All models failed — using fallback script")
+    print("[script] All keys/models failed — using fallback script")
     return _normalize_speaker_tags(_fallback_script(story_seed))
 
 

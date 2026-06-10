@@ -1,5 +1,25 @@
 """Central config for Kwentong Multo — Filipino horror & supernatural YouTube channel."""
 
+import os
+
+def get_openrouter_keys() -> list[str]:
+    """Return all configured OpenRouter API keys in order.
+
+    Reads OPENROUTER_API_KEY (primary) plus OPENROUTER_API_KEY_2 …
+    OPENROUTER_API_KEY_10.  Empty / missing slots are skipped.
+    Returns at least an empty list if none are set.
+    """
+    keys = []
+    primary = os.getenv("OPENROUTER_API_KEY", "").strip()
+    if primary:
+        keys.append(primary)
+    for i in range(2, 11):
+        k = os.getenv(f"OPENROUTER_API_KEY_{i}", "").strip()
+        if k:
+            keys.append(k)
+    return keys
+
+
 CHANNEL_NAME = "Kwentong Multo"
 CHANNEL_NICHE = "tagalog_horror"
 
