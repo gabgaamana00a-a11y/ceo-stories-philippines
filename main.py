@@ -1,17 +1,17 @@
-﻿"""
-main.py — Drama Desk pipeline orchestrator.
+"""
+main.py — Kwentong Multo pipeline orchestrator.
 
 Daily flow:
-  1. Fetch trending story seed from Reddit (or curated fallback)
-  2. Generate original multi-voice drama script via OpenRouter
-  3. Synthesize multi-voice TTS audio (Edge TTS)
+  1. Pick horror story seed from rotating Filipino category
+  2. Generate original Tagalog horror script via OpenRouter
+  3. Synthesize multi-voice TTS audio (Edge TTS — Filipino voices)
   4. Render 1920x1080 YouTube video with Pexels B-roll + subtitles
-  5. Generate thumbnail
+  5. Generate horror-style thumbnail
   6. Upload to YouTube
 
 Run manually:
     python main.py
-    python main.py --seed "My boss publicly humiliated me and I quit on the spot"
+    python main.py --seed "Nakita ko ang aswang sa aming kapitbahay isang gabi"
     python main.py --no-upload
 """
 
@@ -27,7 +27,7 @@ load_dotenv()
 from config import (
     CHANNEL_NAME, UPLOAD_TAGS, UPLOAD_PRIVACY, UPLOAD_CATEGORY, SCENE_KEYWORDS
 )
-from trending import get_trending_drama_seed
+from trending import get_trending_drama_seed, is_title_used, save_used_title, append_video_log
 from script_writer import generate_drama_script
 from tts_engine import generate_drama_audio
 from video_renderer import render_drama_video
@@ -41,20 +41,18 @@ def _extract_scene_tags(script: str) -> list[str]:
     lower = script.lower()
     tags = []
     scene_map = {
-        "restaurant": ["restaurant dining", "cafe table"],
-        "kitchen":    ["kitchen home", "cooking"],
-        "bedroom":    ["bedroom interior"],
-        "office":     ["office workplace", "business people"],
-        "wedding":    ["wedding ceremony", "bride groom"],
-        "phone":      ["smartphone texting", "phone call"],
-        "family":     ["family dinner", "family gathering"],
-        "park":       ["park outdoor", "city street people"],
-        "outdoor":    ["city street people", "outdoor lifestyle"],
-        "argument":   ["couple conflict", "people dramatic"],
-        "couple":     ["couple relationship"],
-        "money":      ["money finance"],
-        "hospital":   ["hospital interior", "medical"],
-        "car":        ["car interior", "driving"],
+        "gubat":      ["dark forest night", "foggy forest"],
+        "ilog":       ["river night dark", "dark water"],
+        "bahay":      ["dark house interior", "abandoned house"],
+        "ospital":    ["hospital corridor dark", "hospital night"],
+        "paaralan":   ["empty school corridor", "dark school"],
+        "kwarto":     ["dark bedroom", "dim room"],
+        "baryo":      ["rural village night", "tropical village dark"],
+        "abroad":     ["city night street", "dark apartment"],
+        "gabi":       ["dark night", "moonlit forest"],
+        "bundok":     ["dark mountain", "foggy forest path"],
+        "simbahan":   ["church dark interior", "old church night"],
+        "default":    ["dark forest night", "foggy path", "abandoned building"],
     }
     for keyword, pexels_kws in scene_map.items():
         if keyword in lower:
@@ -69,160 +67,148 @@ def _extract_scene_tags(script: str) -> list[str]:
 # Keyword-matched punchy title pools — no raw seed text dumped in.
 # Top AITA channels use short emotional hooks, not full sentences.
 _TITLE_POOLS = [
-    # (keywords, [title variants])
-    (["wedding", "venue", "bride", "ceremony", "tacky"], [
-        "She Called My Sister's Wedding TACKY and Now the Family is DONE With Her 😱",
-        "I Said ONE Thing About the Wedding and Destroyed the Whole Family | AITA",
-        "Was I Wrong to Call Her Wedding Choice Embarrassing? | Reddit Drama",
-        "She Ruined the Wedding With ONE Sentence and I'm Still Not Over It | AITA",
+    (["aswang", "manananggal", "capiz"], [
+        "Nakita Ko ang Aswang — Totoo ang Mga Alamat ng Aming Baryo 😱 | Kwentong Multo",
+        "Ang Lihim ng Aming Kapit-Bahay ay Aswang Pala 😱 | Horror Story Tagalog",
+        "Kapre, Aswang, at ang Gabi na Magpakailanman Kong Aalalahanin | Kwentong Multo",
     ]),
-    (["cheating", "affair", "cheated"], [
-        "I Found Out She Was Cheating and I'm Not Sorry 😤 | Reddit Drama AITA",
-        "He Thought I'd Never Find Out… He Was Wrong | Reddit AITA Drama",
-        "She Was Cheating the Whole Time and Nobody Saw This Coming 😱 | AITA",
+    (["multo", "ghost", "white lady", "patay"], [
+        "Ang Multo na Hindi Alam na Patay Na Siya 👻 | Kwentong Multo Tagalog",
+        "White Lady sa Aming Bahay — Hindi Ito Alamat 😱 | True Horror Story",
+        "Nakita Ko ang Aking Namatay na Lola sa Salamin 😱 | Kwentong Horror",
     ]),
-    (["divorce", "separated"], [
-        "The Divorce No One Saw Coming — And I'm Still Not Over It | AITA Drama",
-        "My Marriage Ended Over This and EVERYONE Has an Opinion 😤 | Reddit AITA",
+    (["ofw", "abroad", "japan", "hong kong", "dubai", "saudi"], [
+        "OFW Horror Story — May Sumusunod sa Akin Mula sa Pilipinas 😱 | Kwentong Multo",
+        "Ang Aking Kwarto sa Abroad ay May Naninirahan na Hindi Ko Nakita | Horror",
+        "Nag-abroad Ako at Natuklasan Ko ang Pinaka-Nakakatakot na Bagay 👻 | OFW Horror",
     ]),
-    (["fired", "quit", "boss", "workplace"], [
-        "I Quit My Job in Front of EVERYONE and Never Looked Back 😤 | AITA",
-        "My Boss Pushed Me Too Far… So I Did This | Reddit Drama AITA",
-        "I Said What Nobody Else Would Say at Work and the Drama Was UNREAL | AITA",
+    (["paaralan", "eskwelahan", "school", "kolehiyo", "unibersidad"], [
+        "Ang Multo sa Aming Eskwelahan — May Kaklase Kaming Hindi Tao 😱 | Horror Tagalog",
+        "Ang Kwarto 217 ng Aming Unibersidad ay Bawal Pumasok — Natuklasan Ko Kung Bakit | Horror",
+        "Namatay ang Aming Kaklase Ngunit Patuloy Siyang Dumadalo sa Klase 👻 | Kwentong Multo",
     ]),
-    (["mother-in-law", "mil"], [
-        "My Mother-In-Law CROSSED the Line and I Finally Snapped | Reddit AITA",
-        "She Went Too Far and I'm DONE Being Silent | Reddit Drama AITA",
+    (["ospital", "hospital", "nurse", "doktor"], [
+        "Nagtatrabaho Bilang Nurse — Ang Pasyente sa Kwarto 404 ay Hindi Naka-Admit 😱 | Horror",
+        "Ang Ospital na Ito ay May Lihim na Walang Gustong Ibahagi | Kwentong Multo",
+        "Ang Morgue ng Aming Ospital ay May Kakaibang Gawi 👻 | True Hospital Horror Story",
     ]),
-    (["mom", "mother", "stepmom"], [
-        "My Own Mom BETRAYED Me and the Family is SPLIT | Reddit AITA Drama",
-        "She's My Mom and She Still Did THIS — Am I Wrong for Cutting Her Off? | AITA",
+    (["probinsya", "baryo", "batangas", "ilocos", "visayas", "laguna"], [
+        "Ang Baryo ng Aming Pamilya ay May Lihim na Tatlong Henerasyon Nang Inililihim 😱",
+        "Ang Daan ng Patay sa Aming Probinsya — Natuklasan Ko Kung Bakit | Kwentong Multo",
+        "Natulog Kami sa Lumang Bahay sa Probinsya — Hindi Kami Nag-iisa 👻 | Horror Tagalog",
     ]),
-    (["sister"], [
-        "My Sister Did the Unthinkable and the Whole Family Chose Sides | AITA",
-        "She's My Sister and She STILL Did That 😱 | Reddit Drama AITA",
-        "My Sister Crossed a Line I Can't Come Back From | Reddit AITA",
+    (["engkanto", "kapre", "tikbalang", "duwende", "dwende"], [
+        "Ang Kapre sa Puno ng Balete — Naniwala Ako na Alamat Lamang Ito 😱 | Kwentong Multo",
+        "Naligaw Kami sa Gubat at ang Duwende ang Nagligtas Sa Amin | Filipino Horror",
+        "Ang Engkanto ng Aming Ilog ay Naghingi ng Kapalit 👻 | Kwentong Multo Tagalog",
     ]),
-    (["brother"], [
-        "My Brother Crossed the Line and I Finally Said Enough | Reddit AITA",
-        "He's My Brother and He STILL Did This — Who's Wrong Here? | AITA Drama",
+    (["pamilya", "lola", "lolo", "ninuno", "curse"], [
+        "Ang Sumpa ng Aming Pamilya — Ikinuwento ng Aking Lola Bago Siya Pumanaw 😱",
+        "May Sumusunod sa Aming Lipi na Mula sa Kasalanan ng Aming Ninuno | Horror",
+        "Ang Lumang Baul na Hindi Dapat Buksan — Ngunit Binuksan Namin 👻 | Kwentong Multo",
     ]),
-    (["boyfriend", "girlfriend", "ex", "dating"], [
-        "My Ex Thought I'd Stay Silent… They Were WRONG 😤 | Reddit Drama AITA",
-        "She Did This Behind My Back and NOBODY Saw It Coming 😱 | AITA",
-        "I Found Out the Truth About My Partner and Everything Changed | AITA Drama",
+    (["panaginip", "paranormal", "premonisyon"], [
+        "Paulit-Ulit Kong Nangangarap ng Parehong Babae — Ngayon ay Natuklasan Ko Kung Sino Siya 😱",
+        "Ang Aking Asawa ay Nagsasalita Habang Natutulog — Hindi Niya Ito Naalala 👻 | Horror",
+        "May Mga Larawang Hindi Ko Kinuha sa Aking Telepono — Nasa Loob ng Aming Bahay 😱",
     ]),
-    (["husband"], [
-        "My Husband's Secret Came Out and Changed EVERYTHING | Reddit AITA Drama",
-        "He Thought I Didn't Know… But I Knew Everything 😤 | Reddit Drama",
-    ]),
-    (["wife"], [
-        "She Hid This From Me for YEARS and I Finally Found Out 😱 | AITA Drama",
-        "My Wife Did This Behind My Back and I'm Still Not Over It | Reddit AITA",
-    ]),
-    (["money", "cash", "stole", "loan", "debt"], [
-        "She Took Everything and Thought I'd Stay Silent — She Was Wrong 😤 | AITA",
-        "I Did the Math and Finally SNAPPED | Reddit Drama AITA",
-    ]),
-    (["party", "invite", "birthday", "christmas"], [
-        "They Left Me Out and Then Had the Nerve to Be Upset | Reddit AITA",
-        "I Wasn't Invited and I Made Sure They Knew It 😤 | AITA Drama",
-    ]),
-    (["secret", "lied", "hiding", "truth"], [
-        "The Truth Finally Came Out and NOBODY Was Ready For It 😱 | Reddit AITA",
-        "She Was Hiding This the Whole Time and I Am FLOORED | AITA Drama",
-    ]),
-    (["family"], [
-        "This Family Drama Has EVERYONE Divided and I Need YOUR Verdict | AITA",
-        "My Whole Family is Against Me — But Was I Really Wrong? | Reddit AITA",
+    (["urban", "bgc", "makati", "quezon", "maynila", "manila", "lrt", "mrt"], [
+        "Ang Elevator ng Aming Opisina ay Palaging Humihinto sa Ikapitong Palapag 😱 | Urban Legend",
+        "Ang White Lady ng Balete Drive — Napatunayan Ko Ito Isang Gabi 👻 | Kwentong Multo",
+        "Ang LRT Station na Aming Ginagamit Araw-Araw ay May Lihim | Horror Tagalog",
     ]),
 ]
 
-# Generic pool used when no keyword matches
 _GENERIC_TITLES = [
-    "Nobody Saw This Coming 😱 and I'm Still Processing It | Reddit AITA Drama",
-    "I Said What I Said and I'm Not Sorry 😤 | Reddit Drama AITA",
-    "The Truth Came Out and EVERYTHING Changed — Who's Wrong Here? | AITA",
-    "They Thought I'd Stay Silent… They Were WRONG | Reddit Drama AITA",
-    "This Drama Has EVERYONE Divided and I Need Your Verdict | AITA Drama",
-    "I Did the Thing Nobody Expected and Now the Family is SPLIT | AITA",
-    "She Crossed a Line I Can't Come Back From 😤 | Reddit AITA Drama",
+    "Nakaranas Ako ng Bagay na Hindi Ko Kayang Ipaliwanag 😱 | Kwentong Multo Tagalog",
+    "Ang Pinakanakakatakot na Gabi ng Aking Buhay 👻 | True Horror Story Philippines",
+    "Hindi Ako Naniniwala sa Multo Noon — Hanggang sa Mangyari Ito Sa Akin 😱 | Kwentong Horror",
+    "Totoo Ba Ito? Ang Karanasang Hindi Ko Malilimutan 👻 | Kwentong Multo",
+    "Ang Lihim ng Aming Lugar na Ilang Taon Ko Nang Iniingatan 😱 | Horror Story Tagalog",
+    "Wala Akong Makausap — Dahil Sila ay Patay Na 👻 | Kwentong Multo Philippines",
 ]
 
 
 def _make_title(story_seed: str) -> str:
-    """Generate a unique viral title via LLM, fall back to keyword pools."""
+    """Generate a unique viral Tagalog horror title via LLM, fall back to keyword pools."""
     api_key = os.getenv("OPENROUTER_API_KEY", "")
     if api_key:
-        try:
-            import requests as _req
-            prompt = (
-                f'Generate ONE YouTube title for a viral AITA/Reddit drama video about this story:\n"{story_seed}"\n\n'
-                "Rules:\n"
-                "- 60-80 characters total (fits mobile without truncation)\n"
-                "- Front-load the emotional hook — don't start with 'AITA'\n"
-                "- Include exactly ONE emoji (😱 💀 😤 🤯 or 🔥)\n"
-                "- End with | AITA or | Reddit Drama\n"
-                "- Use power words: EXPOSED, FINALLY, NOBODY, EVERYONE, TRUTH, SECRET, SHOCKED\n"
-                "- Output ONLY the title, nothing else, no quotes"
-            )
-            resp = _req.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
-                json={
-                    "model": "google/gemini-2.0-flash-lite-001",
-                    "messages": [{"role": "user", "content": prompt}],
-                    "max_tokens": 80,
-                    "temperature": 1.0,
-                },
-                timeout=15,
-            )
-            if resp.status_code == 200:
-                title = resp.json()["choices"][0]["message"]["content"].strip().strip('"').strip("'")
-                if 45 <= len(title) <= 100:
-                    print(f"[title] LLM: {title}")
-                    return title
-        except Exception as e:
-            print(f"[title] LLM failed, using pool: {e}")
-    # fallback to keyword pools
+        for _attempt in range(3):
+            try:
+                import requests as _req
+                prompt = (
+                    f'Gumawa ng ISANG YouTube title para sa Tagalog horror video tungkol sa kwentong ito:\n"{story_seed}"\n\n'
+                    "Mga Patakaran:\n"
+                    "- 50-80 character ang kabuuan\n"
+                    "- Tagalog ang salita (Filipino)\n"
+                    "- Magsimula sa nakakatakot na hook — tulad ng: Nakita Ko, Natuklasan Ko, Hindi Ko Malilimutan\n"
+                    "- Kasama ang ISANG emoji (😱 👻 😨 😐 o 🔊)\n"
+                    "- Tapusin sa | Kwentong Multo o | Horror Tagalog\n"
+                    "- I-output LAMANG ang title, walang iba, walang quotes"
+                )
+                resp = _req.post(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                    json={
+                        "model": "google/gemini-2.5-flash",
+                        "messages": [{"role": "user", "content": prompt}],
+                        "max_tokens": 80,
+                        "temperature": 1.0,
+                    },
+                    timeout=15,
+                )
+                if resp.status_code == 200:
+                    title = resp.json()["choices"][0]["message"]["content"].strip().strip('"').strip("'")
+                    if 45 <= len(title) <= 100 and not is_title_used(title):
+                        print(f"[title] LLM (attempt {_attempt+1}): {title}")
+                        return title
+                    elif is_title_used(title):
+                        print(f"[title] Title already used, retrying...")
+            except Exception as e:
+                print(f"[title] LLM failed, using pool: {e}")
+                break
+    # fallback to keyword pools (pick unused variant)
     s = story_seed.lower()
     for keywords, pool in _TITLE_POOLS:
         if any(k in s for k in keywords):
-            return random.choice(pool)
-    return random.choice(_GENERIC_TITLES)
+            unused = [t for t in pool if not is_title_used(t)]
+            if unused:
+                return random.choice(unused)
+            return random.choice(pool)  # all used — allow repeat from pool
+    unused_generic = [t for t in _GENERIC_TITLES if not is_title_used(t)]
+    return random.choice(unused_generic) if unused_generic else random.choice(_GENERIC_TITLES)
 
 
 def _make_description(story_seed: str, title: str) -> str:
-    # First 2 lines show before "Show more" — they must hook and include keywords
     hook = story_seed[:150] if len(story_seed) > 150 else story_seed
     hashtags = (
-        "#AITA #AmITheAsshole #RedditDrama #RedditStories #RelationshipAdvice "
-        "#FamilyDrama #DramaDesk #StoryTime #TrueStory #EntitledPeople "
-        "#AITAReddit #RelationshipDrama #DailyDrama #RedditReading "
-        "#DramaChannel #Reddit #aita2024 #redditstorytime #amiwrong "
-        "#toxicrelationship #redditrelationship #viralstory"
+        "#KwentongMulto #HorrorTagalog #PinoyHorror #KwentongHorror "
+        "#TotoonaKwento #AswangStory #MultoPhilippines #HorrorStoryPhilippines "
+        "#ScaryStories #TruePinoyHorror #OFWHorror #PinoyCreepypasta "
+        "#PhilippineHorror #TrueHorrorStory #KwentongSindak "
+        "#nakakatakot #multo #aswang #engkanto #filipinohorror"
     )
     return (
-        f"⚡ {hook}\n"
-        f"Drop your verdict below — ❤️ if OP was RIGHT, 💀 if they went TOO FAR.\n\n"
-        f"Welcome to Drama Desk — real stories, real reactions, real drama. "
-        f"Every day we cover the most shocking AITA and Reddit drama stories "
-        f"that have the internet completely divided. Watch till the end — "
-        f"I read the top comments in the NEXT video.\n\n"
-        f"👇 VOTE:\n"
-        f"❤️ = OP was RIGHT\n"
-        f"💀 = OP went too far\n"
-        f"🤔 = Everyone's wrong\n\n"
-        f"⏱️ CHAPTERS\n"
-        f"0:00 The Most Shocking Part First\n"
-        f"0:30 The Full Story\n"
-        f"2:00 Where It Goes Wrong\n"
-        f"3:30 The Confrontation\n"
-        f"5:00 The Aftermath\n"
-        f"6:00 Who's REALLY in the Wrong?\n\n"
-        f"🔔 Subscribe + hit the bell — new story EVERY day!\n"
-        f"👍 Like if you stayed till the end\n"
-        f"📢 Share with someone who lives for drama\n\n"
+        f"😱 {hook}\n"
+        f"Mag-comment ng 😱 kung naniniwala ka, o 💀 kung sa tingin mo ay kathang-isip lamang.\n\n"
+        f"Maligayang pagdating sa Kwentong Multo — ang channel ng mga totoong karanasan "
+        f"ng mga Pilipino sa mga bagay na hindi maipaliwanag. Aswang, multo, engkanto, "
+        f"at mga misteryong mula sa ating sariling kultura. "
+        f"Pakinggan hanggang sa katapusan — maaaring mayroon ka ring katulad na karanasan.\n\n"
+        f"👇 IBOTO MO:\n"
+        f"😱 = Naniniwala ako sa kwento\n"
+        f"💀 = Kathang-isip lamang ito\n"
+        f"🤔 = Hindi ako sigurado\n\n"
+        f"⏱️ MGA KABANATA\n"
+        f"0:00 Ang Pinaka-Nakakatakot na Sandali\n"
+        f"0:30 Ang Buong Kwento\n"
+        f"2:00 Nagsimulang Maging Kakaiba\n"
+        f"3:30 Ang Pinaka-Nakakatakot na Bahagi\n"
+        f"5:00 Ang Nangyari Pagkatapos\n"
+        f"6:30 Totoo Ba Ito?\n\n"
+        f"🔔 Mag-subscribe at pindutin ang bel — bagong kwento ARAW-ARAW!\n"
+        f"👍 I-like kung nanatili ka hanggang sa katapusan\n"
+        f"📢 I-share sa iyong mga kaibigan na mahilig sa kwentong multo\n\n"
         f"{hashtags}"
     )
 
@@ -381,8 +367,8 @@ def _upload_youtube(video_path: str, title: str, description: str, thumb_path: s
                 "description":          description[:5000],
                 "tags":                 UPLOAD_TAGS,
                 "categoryId":           UPLOAD_CATEGORY,
-                "defaultLanguage":      "en",
-                "defaultAudioLanguage": "en",
+                "defaultLanguage":      "fil",
+                "defaultAudioLanguage": "fil",
             },
             "status": {
                 "privacyStatus":           UPLOAD_PRIVACY,
@@ -505,6 +491,16 @@ def create_drama_video(
     with open(result_path, "w", encoding="utf-8") as f:
         json.dump(result, f, indent=2)
 
+    # ── Log title + video record ───────────────────────────────────────────────
+    save_used_title(title)
+    append_video_log({
+        "date":             timestamp,
+        "seed":             story_seed,
+        "title":            title,
+        "youtube_url":      url,
+        "duration_seconds": dur,
+    })
+
     print(f"\n{banner}")
     print(f"DONE  →  {video_path}")
     if url:
@@ -518,7 +514,7 @@ def create_drama_video(
 
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser(description="Drama Desk — daily video generator")
+    parser = argparse.ArgumentParser(description="Kwentong Multo — daily horror video generator")
     parser.add_argument("--seed",      type=str,  default=None, help="Custom story seed")
     parser.add_argument("--no-upload", action="store_true",     help="Skip YouTube upload")
     parser.add_argument("--output",    type=str,  default=None, help="Output directory")
@@ -534,21 +530,21 @@ if __name__ == "__main__":
         yt_url = result.get("youtube_url")
         if yt_url:
             _notify_telegram(
-                f"\u2705 <b>Drama video uploaded!</b>\n\n"
-                f"\U0001f3ac {result['title']}\n"
+                f"\u2705 <b>Kwentong Multo — Na-upload na!</b>\n\n"
+                f"\U0001f47b {result['title']}\n"
                 f"\U0001f517 {yt_url}\n\n"
                 f"\U0001f4e6 Repo: {repo}"
             )
         elif not args.no_upload:
             _notify_telegram(
-                f"\u26a0\ufe0f <b>Video rendered but YouTube upload failed.</b>\n"
-                f"Check Actions logs for details.\n\n"
+                f"\u26a0\ufe0f <b>Kwentong Multo — Na-render pero hindi na-upload sa YouTube.</b>\n"
+                f"Tingnan ang Actions logs para sa detalye.\n\n"
                 f"\U0001f4e6 Repo: {repo}"
             )
     except Exception as exc:
         repo = os.getenv("GITHUB_REPOSITORY", "local")
         _notify_telegram(
-            f"\u274c <b>Drama pipeline failed:</b>\n\n"
+            f"\u274c <b>Kwentong Multo — Pipeline failed:</b>\n\n"
             f"<code>{exc}</code>\n\n"
             f"\U0001f4e6 Repo: {repo}"
         )

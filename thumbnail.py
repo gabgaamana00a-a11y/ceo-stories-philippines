@@ -1,17 +1,21 @@
 """
-thumbnail.py — Viral-optimized thumbnail generator for Drama Desk.
+thumbnail.py — High-CTR Filipino horror thumbnail for Kwentong Multo.
 
-Layout: Real face photo from Pexels (shocked/emotional) + short punchy text.
-Formula used by top AITA/Reddit drama channels with 1M+ subs:
-  - Human face showing emotion = #1 CTR driver
-  - 4-6 word text max (Impact font, massive, with black outline)
-  - "AITA?" badge top-left
-  - Clean, not cluttered
+Design formula (what drives clicks on Filipino horror YouTube):
+  • Near-black background with deep red atmospheric glow
+  • Terrified face photo on right side (Pexels), darkened + red-tinted
+  • Glowing red eyes emerging from darkness (iconic horror motif)
+  • Faint ghost silhouette (misty humanoid)
+  • Blood drips from top edge
+  • Large Tagalog hook text left-side, Impact font (white + blood-red)
+  • "NAKAKATAKOT!" badge top-left
+  • Bottom channel bar
 """
 
 import os
 import math
 import random
+import hashlib
 from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont, ImageFilter, ImageEnhance
 
@@ -26,84 +30,131 @@ def generate_thumbnail(
     story_seed: str = None,
     pexels_key: str = None,
 ) -> str:
-    os.makedirs(os.path.dirname(output_path) if os.path.dirname(output_path) else ".", exist_ok=True)
+    os.makedirs(
+        os.path.dirname(output_path) if os.path.dirname(output_path) else ".",
+        exist_ok=True,
+    )
     W, H = 1280, 720
 
-    # 1. Background: real face photo > video frame > gradient (in priority order)
-    bg = None
+    # Stable RNG seeded from story seed (reproducible, same seed = same thumbnail)
+    seed_str  = story_seed or title or "default"
+    seed_int  = int(hashlib.md5(seed_str.encode()).hexdigest()[:8], 16)
+    rng       = random.Random(seed_int)
+
+    # ── 1. Near-black background with red atmospheric glow ────────────────────
+    bg = _dark_horror_bg(W, H)
+
+    # ── 2. Scared face photo on right side (optional) ─────────────────────────
+    face = None
     if pexels_key and story_seed:
-        bg = _fetch_dramatic_photo(story_seed, pexels_key, W, H)
-    if bg is None and background_video_path and os.path.exists(background_video_path):
+        face = _fetch_dramatic_photo(story_seed, pexels_key, W, H)
+    if face is None and background_video_path and os.path.exists(background_video_path):
         try:
-            bg = _extract_frame(background_video_path, W, H)
+            face = _extract_frame(background_video_path, W, H)
         except Exception:
             pass
-    if bg is None:
-        bg = _dark_gradient(W, H)
 
-    # 2. Mood: slightly darker + contrast boost for drama feel
-    bg = ImageEnhance.Brightness(bg).enhance(0.65)
-    bg = ImageEnhance.Contrast(bg).enhance(1.25)
+    if face is not None:
+        # Darken heavily + red tint — face is atmosphere, not subject
+        face = ImageEnhance.Brightness(face).enhance(0.38)
+        face = ImageEnhance.Contrast(face).enhance(1.45)
+        red_wash  = Image.new("RGBA", (W, H), (85, 0, 0, 65))
+        face_rgba = Image.alpha_composite(face.convert("RGBA"), red_wash)
+        # Horizontal fade mask: transparent left → opaque right
+        fade       = Image.new("L", (W, H), 0)
+        fade_start = int(W * 0.40)
+        fade_end   = int(W * 0.72)
+        fd = ImageDraw.Draw(fade)
+        for x in range(fade_start, W):
+            a = int(240 * min(1.0, (x - fade_start) / (fade_end - fade_start)) ** 0.55)
+            fd.line([(x, 0), (x, H)], fill=a)
+        bg = bg.convert("RGBA")
+        bg.paste(face_rgba, mask=fade)
+        bg = bg.convert("RGB")
 
-    # 3. Vignette — smooth gradient: opaque left (text area) → transparent right (face)
-    bg = bg.convert("RGBA")
-    vignette = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-    vd = ImageDraw.Draw(vignette)
-    # Draw column-by-column for a smooth fade: 155 alpha at x=0, 0 alpha at x=W*0.68
-    fade_end = int(W * 0.68)
-    for x in range(fade_end):
-        alpha = int(158 * (1.0 - x / fade_end) ** 0.7)   # power curve: fast drop-off
-        vd.line([(x, 0), (x, H)], fill=(0, 0, 0, alpha))
-    # Uniform light tint on right side so face stays readable
-    vd.rectangle([fade_end, 0, W, H], fill=(0, 0, 0, 28))
-    # Top strip (brand bar area)
-    vd.rectangle([0, 0, W, 85], fill=(0, 0, 0, 90))
-    bg = Image.alpha_composite(bg, vignette).convert("RGB")
+    # ── 3. Ghost silhouette ────────────────────────────────────────────────────
+    bg = _draw_ghost_silhouette(bg, W, H, rng)
+
+    # ── 4. Edge vignette + bottom red glow reinforcement ──────────────────────
+    bg = _apply_horror_atmosphere(bg, W, H)
+
+    # ── 5. Glowing red eyes ────────────────────────────────────────────────────
+    bg = _draw_glowing_eyes(bg, W, H, rng)
 
     draw = ImageDraw.Draw(bg)
 
-    # 4. Short punchy thumbnail text (4-6 words, NOT the full title)
-    thumb_text = _make_thumbnail_text(story_seed or title)
+    # ── 6. Blood drips from top edge ──────────────────────────────────────────
+    _draw_blood_drips(draw, W, rng)
 
-    # 5. Compose elements
-    _draw_aita_badge(draw, W)
-    _draw_main_text(draw, thumb_text, W, H)
-    _draw_starburst(draw, W)
+    # ── 7. Horror badge top-left ───────────────────────────────────────────────
+    _draw_horror_badge(draw)
+
+    # ── 8. Large Tagalog hook text (returns new bg because of glow pass) ───────
+    hook = _make_tagalog_horror_text(story_seed or title, rng)
+    bg   = _draw_main_horror_text(bg, W, H, hook)
+
+    # ── 9. Bottom channel bar ─────────────────────────────────────────────────
+    draw = ImageDraw.Draw(bg)
     _draw_bottom_bar(draw, W, H)
-    _draw_border(draw, W, H)
 
     bg.save(output_path, "PNG", quality=95)
     print(f"Thumbnail saved: {output_path}")
     return output_path
 
 
-# ── Background helpers ────────────────────────────────────────────────────────
+# ── Background ────────────────────────────────────────────────────────────────
 
-def _fetch_dramatic_photo(seed: str, pexels_key: str, W: int, H: int) -> "Image.Image | None":
-    """Download a shocked/emotional face photo from Pexels matching the story theme."""
+def _dark_horror_bg(W: int, H: int) -> Image.Image:
+    """Near-black base (#030008) with deep red radial glow from bottom-center."""
+    bg   = Image.new("RGB", (W, H), (3, 0, 8))
+    draw = ImageDraw.Draw(bg)
+
+    cx, cy = W // 2, H + 60
+    for r in range(350, 0, -5):
+        t   = 1.0 - r / 350
+        red = int(80 * (t ** 2.2))
+        draw.ellipse(
+            [cx - r * 2, cy - r, cx + r * 2, cy + r],
+            fill=(red, 0, 0),
+        )
+
+    # Top-half extra darkening
+    dark = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    dd   = ImageDraw.Draw(dark)
+    for y in range(H // 2):
+        a = int(130 * (1 - y / (H / 2)) ** 1.3)
+        dd.line([(0, y), (W, y)], fill=(0, 0, 0, a))
+    bg = Image.alpha_composite(bg.convert("RGBA"), dark).convert("RGB")
+    return bg
+
+
+# ── Pexels photo helper ───────────────────────────────────────────────────────
+
+def _fetch_dramatic_photo(seed: str, pexels_key: str, W: int, H: int):
     try:
         import requests
     except ImportError:
         return None
 
     s = seed.lower()
-    # Theme → emotional face queries (faces = highest CTR on AITA content)
-    if any(k in s for k in ["wedding", "bride", "ceremony", "groom", "venue"]):
-        queries = ["shocked woman face", "upset woman portrait", "surprised woman dramatic"]
-    elif any(k in s for k in ["cheating", "affair", "cheated"]):
-        queries = ["sad woman crying", "shocked woman portrait", "upset woman face close up"]
-    elif any(k in s for k in ["divorce", "separated"]):
-        queries = ["crying woman portrait", "upset woman dramatic", "sad woman face"]
-    elif any(k in s for k in ["boss", "fired", "quit", "job", "work"]):
-        queries = ["angry woman face", "shocked professional woman", "upset woman office portrait"]
-    elif any(k in s for k in ["mom", "mother", "stepmom", "parent"]):
-        queries = ["shocked woman face", "angry woman portrait", "upset woman close up"]
-    elif any(k in s for k in ["sister", "brother", "sibling"]):
-        queries = ["upset woman dramatic face", "shocked woman", "emotional woman portrait"]
-    elif any(k in s for k in ["money", "cash", "debt", "stole", "loan"]):
-        queries = ["shocked woman stressed", "upset woman face", "worried woman portrait"]
+    if any(k in s for k in ["aswang", "manananggal", "mantiw"]):
+        queries = ["terrified woman dark", "scared face dark night"]
+    elif any(k in s for k in ["multo", "kaluluwa", "sulok", "telepono", "bangungot"]):
+        queries = ["horrified woman face dark", "scared woman dark room"]
+    elif any(k in s for k in ["ospital", "hospital", "nurse"]):
+        queries = ["dark hospital corridor night", "scared woman hospital"]
+    elif any(k in s for k in ["paaralan", "school", "eskwela"]):
+        queries = ["scared student face dark", "dark school hallway"]
+    elif any(k in s for k in ["gubat", "kagubatan", "probinsya", "baryo"]):
+        queries = ["dark forest fog horror", "scared woman forest night"]
+    elif any(k in s for k in ["ofw", "abroad", "japan", "dubai", "hongkong"]):
+        queries = ["terrified asian woman dark", "scared woman dark room"]
+    elif any(k in s for k in ["engkanto", "kapre", "tikbalang", "duwende"]):
+        queries = ["eerie foggy forest night", "mysterious dark forest"]
+    elif any(k in s for k in ["panaginip", "bangungot", "tulog"]):
+        queries = ["terrified woman nightmare dark", "scared woman bed dark"]
     else:
-        queries = ["shocked woman face portrait", "surprised dramatic woman", "emotional woman upset"]
+        queries = ["terrified woman dark portrait", "horrified face darkness"]
 
     headers = {"Authorization": pexels_key}
     for q in queries:
@@ -119,76 +170,313 @@ def _fetch_dramatic_photo(seed: str, pexels_key: str, W: int, H: int) -> "Image.
             photos = resp.json().get("photos", [])
             if not photos:
                 continue
-            photo = random.choice(photos[:8])
+            photo   = random.choice(photos[:8])
             img_url = photo["src"].get("large2x") or photo["src"].get("large")
-            img_resp = requests.get(img_url, timeout=30)
-            if img_resp.status_code == 200:
-                img = Image.open(BytesIO(img_resp.content)).convert("RGB")
+            ir = requests.get(img_url, timeout=30)
+            if ir.status_code == 200:
+                img = Image.open(BytesIO(ir.content)).convert("RGB")
                 img = _crop_to_ratio(img, W, H)
-                print(f"[thumbnail] Photo: '{q}' by {photo.get('photographer', 'Pexels')}")
+                print(f"[thumbnail] Photo: '{q}' by {photo.get('photographer','Pexels')}")
                 return img
         except Exception:
             continue
     return None
 
 
-def _crop_to_ratio(img: "Image.Image", W: int, H: int) -> "Image.Image":
-    """Center-crop to 16:9, bias toward top third (faces are usually there)."""
+def _crop_to_ratio(img: Image.Image, W: int, H: int) -> Image.Image:
     iw, ih = img.size
-    target_ratio = W / H
-    img_ratio = iw / ih
-    if img_ratio > target_ratio:
-        new_w = int(ih * target_ratio)
-        left = (iw - new_w) // 2
-        img = img.crop((left, 0, left + new_w, ih))
+    tr, ir = W / H, iw / ih
+    if ir > tr:
+        nw   = int(ih * tr)
+        left = (iw - nw) // 2
+        img  = img.crop((left, 0, left + nw, ih))
     else:
-        new_h = int(iw / target_ratio)
-        top = (ih - new_h) // 3   # bias toward top (face location)
-        img = img.crop((0, top, iw, top + new_h))
+        nh  = int(iw / tr)
+        top = (ih - nh) // 3
+        img = img.crop((0, top, iw, top + nh))
     return img.resize((W, H), Image.LANCZOS)
 
 
-def _extract_frame(video_path: str, W: int, H: int) -> "Image.Image":
+def _extract_frame(video_path: str, W: int, H: int) -> Image.Image:
     from moviepy import VideoFileClip
-    clip = VideoFileClip(video_path)
+    clip  = VideoFileClip(video_path)
     frame = clip.get_frame(clip.duration * 0.25)
     clip.close()
-    img = Image.fromarray(frame)
-    return _crop_to_ratio(img, W, H)
+    return _crop_to_ratio(Image.fromarray(frame), W, H)
 
 
-def _dark_gradient(W: int, H: int) -> "Image.Image":
-    """Deep red-to-dark fallback gradient (only used when no photo available)."""
-    img = Image.new("RGB", (W, H))
-    for y in range(H):
-        r = y / H
-        img.paste((int(45 * (1 - r) + 8 * r), int(5 * (1 - r)), int(5 * (1 - r))), (0, y, W, y + 1))
-    return img
+# ── Horror graphic elements ───────────────────────────────────────────────────
+
+def _draw_ghost_silhouette(
+    bg: Image.Image, W: int, H: int, rng: random.Random
+) -> Image.Image:
+    """Faint misty humanoid ghost silhouette, heavily blurred."""
+    ghost = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    gd    = ImageDraw.Draw(ghost)
+
+    gx = int(W * rng.uniform(0.30, 0.44))
+    gy = int(H * 0.22)
+    c  = (195, 210, 230, 22)
+
+    head_r   = 36
+    body_w   = 52
+    body_h   = 130
+    neck_top = gy + head_r - 4
+    body_top = neck_top + 22
+
+    gd.ellipse([gx - head_r, gy - head_r, gx + head_r, gy + head_r], fill=c)
+    gd.rectangle([gx - 11, neck_top, gx + 11, body_top], fill=c)
+    gd.ellipse([gx - body_w, body_top, gx + body_w, body_top + body_h], fill=c)
+    gd.ellipse([gx - body_w - 38, body_top + 18, gx - body_w + 18, body_top + 88], fill=c)
+    gd.ellipse([gx + body_w - 18, body_top + 18, gx + body_w + 38, body_top + 88], fill=c)
+    for i in range(6):
+        yw = body_top + body_h + i * 26
+        w  = body_w - i * 9
+        if w < 4:
+            break
+        gd.ellipse([gx - w, yw, gx + w, yw + 28],
+                   fill=(195, 210, 230, max(4, 18 - i * 4)))
+
+    ghost = ghost.filter(ImageFilter.GaussianBlur(radius=20))
+    return Image.alpha_composite(bg.convert("RGBA"), ghost).convert("RGB")
+
+
+def _apply_horror_atmosphere(bg: Image.Image, W: int, H: int) -> Image.Image:
+    """Dark edge vignette + stronger bottom red glow."""
+    atm = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    d   = ImageDraw.Draw(atm)
+
+    for i in range(55):
+        t = i / 55
+        a = int(195 * (1 - t) ** 1.9)
+        m = i * 6
+        if W - 2 * m < 2 or H - 2 * m < 2:
+            break
+        d.rectangle([m, m, W - m - 1, H - m - 1], outline=(0, 0, 0, a), width=3)
+
+    for y in range(H - 1, H - 200, -1):
+        t = (H - y) / 200
+        a = int(50 * (1 - t) ** 1.4)
+        d.line([(0, y), (W, y)], fill=(110, 0, 0, a))
+
+    return Image.alpha_composite(bg.convert("RGBA"), atm).convert("RGB")
+
+
+def _draw_glowing_eyes(
+    bg: Image.Image, W: int, H: int, rng: random.Random
+) -> Image.Image:
+    """Iconic glowing red eyes in the darkness — center-frame."""
+    ex  = int(W * rng.uniform(0.42, 0.52))
+    ey  = int(H * rng.uniform(0.50, 0.62))
+    gap = 52
+
+    glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    gd   = ImageDraw.Draw(glow)
+
+    for eye_cx in [ex - gap // 2, ex + gap // 2]:
+        for r, a, col in [
+            (36, 10, (160,  0,  0)),
+            (26, 18, (200,  0,  0)),
+            (18, 35, (240, 15,  0)),
+            (11, 70, (255, 60,  0)),
+            ( 5,170, (255,200, 80)),
+        ]:
+            gd.ellipse(
+                [eye_cx - r, ey - r // 2, eye_cx + r, ey + r // 2],
+                fill=(*col, a),
+            )
+
+    glow = glow.filter(ImageFilter.GaussianBlur(radius=7))
+    return Image.alpha_composite(bg.convert("RGBA"), glow).convert("RGB")
+
+
+def _draw_blood_drips(draw: ImageDraw.Draw, W: int, rng: random.Random) -> None:
+    """Blood drips falling from the top edge of the frame."""
+    for _ in range(rng.randint(9, 15)):
+        x   = rng.randint(20, W - 20)
+        h   = rng.randint(22, 90)
+        w   = rng.randint(4, 9)
+        col = (rng.randint(125, 165), 0, 0)
+        draw.rectangle([x - w // 2, 0, x + w // 2, h], fill=col)
+        r = rng.randint(5, 12)
+        draw.ellipse([x - r, h - r // 2, x + r, h + r], fill=col)
+
+
+# ── Badge & text ──────────────────────────────────────────────────────────────
+
+def _draw_horror_badge(draw: ImageDraw.Draw) -> None:
+    """Top-left badge: 'NAKAKATAKOT!' in blood red."""
+    font = _font("impact.ttf", 54)
+    text = "NAKAKATAKOT!"
+    bbox = draw.textbbox((0, 0), text, font=font)
+    tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
+    pad    = 14
+    x1, y1 = 18, 18
+    x2, y2 = x1 + tw + pad * 2, y1 + th + pad
+    draw.rectangle([x1, y1, x2, y2], fill=(145, 0, 0))
+    draw.rectangle([x1, y1, x2, y2], outline=(230, 45, 45), width=3)
+    draw.text((x1 + pad, y1 + pad // 2), text, fill=(255, 255, 255), font=font)
+
+
+def _make_tagalog_horror_text(seed: str, rng: random.Random) -> str:
+    """Map story seed keywords → 2-line Tagalog hook text for high CTR."""
+    s = seed.lower()
+
+    if any(k in s for k in ["aswang", "manananggal", "mantiw", "sigbin"]):
+        hooks = [
+            ("NATUKLASAN KO", "ANG ASWANG!"),
+            ("ASWANG SA", "AMING LUGAR!"),
+            ("NAKITA KO ANG", "TUNAY NA ASWANG!"),
+        ]
+    elif any(k in s for k in ["multo", "kaluluwa", "sulok", "telepono", "bangungot", "nagsalita"]):
+        hooks = [
+            ("NAKITA KO ANG", "MULTO SA AMIN!"),
+            ("MULTO SA", "AMING BAHAY!"),
+            ("HINDI KO", "MALILIMUTAN ITO!"),
+            ("ANG MULTO AY", "KASAMA NAMIN!"),
+            ("NANINIWALA", "KA BA NITO?"),
+        ]
+    elif any(k in s for k in ["ospital", "hospital", "nurse", "doktor", "pasyente"]):
+        hooks = [
+            ("MULTO SA", "OSPITAL!"),
+            ("HORROR SA", "OSPITAL!"),
+            ("ANG DILIM SA", "OSPITAL!"),
+        ]
+    elif any(k in s for k in ["paaralan", "school", "eskwela", "estudyante", "guro"]):
+        hooks = [
+            ("MULTO SA", "AMING ESKWELA!"),
+            ("HORROR SA", "PAARALAN!"),
+            ("NAKATAGPO NG", "MULTO SA ESKWELA!"),
+        ]
+    elif any(k in s for k in ["probinsya", "baryo", "bukid", "palayan", "bundok", "gubat"]):
+        hooks = [
+            ("HORROR SA", "PROBINSYA!"),
+            ("KABABALAGHAN SA", "AMING BARYO!"),
+            ("SINDAK SA", "PROBINSYA!"),
+        ]
+    elif any(k in s for k in ["ofw", "abroad", "japan", "hongkong", "dubai", "taiwan", "singapore"]):
+        hooks = [
+            ("MULTO SA", "ABROAD!"),
+            ("HORROR SA", "IBANG BANSA!"),
+            ("NAKATAGPO NG", "MULTO SA ABROAD!"),
+        ]
+    elif any(k in s for k in ["engkanto", "kapre", "tikbalang", "duwende", "nuno", "sirena"]):
+        hooks = [
+            ("ENGKANTO ANG", "LUMABAS SA GABI!"),
+            ("NAKITA KO ANG", "ENGKANTO!"),
+            ("ANG KAPRE AY", "TOTOO!"),
+        ]
+    elif any(k in s for k in ["anak", "tatay", "nanay", "lolo", "lola", "asawa", "pamilya", "magulang"]):
+        hooks = [
+            ("MULTO SA", "AMING PAMILYA!"),
+            ("ANG SIKRETO NG", "AMING PAMILYA!"),
+            ("HINDI KO", "MALILIMUTAN ITO!"),
+        ]
+    elif any(k in s for k in ["panaginip", "bangungot", "tulog", "gising"]):
+        hooks = [
+            ("PANAGINIP NA", "TOTOO!"),
+            ("HUWAG MANAGINIP", "NITO!"),
+            ("BANGUNGOT NA", "NAGTOTOO!"),
+        ]
+    elif any(k in s for k in ["lungsod", "maynila", "metro", "highway", "urban", "kalsada"]):
+        hooks = [
+            ("URBAN LEGEND NA", "TOTOO!"),
+            ("NATUKLASAN KO", "ANG KATOTOHANAN!"),
+            ("HORROR SA", "LUNGSOD!"),
+        ]
+    else:
+        hooks = [
+            ("HINDI KO", "MALILIMUTAN!"),
+            ("NANINIWALA", "KA BA?"),
+            ("TOTOO ITO!", "NANGYARI SA AKIN!"),
+            ("SINDAK NA", "SINDAK AKO!"),
+            ("NAKATAGPO NG", "MULTO!"),
+        ]
+
+    line1, line2 = rng.choice(hooks)
+    return f"{line1}\n{line2}"
+
+
+def _draw_main_horror_text(bg: Image.Image, W: int, H: int, hook: str) -> Image.Image:
+    """Large 2-line Impact hook text with red/white glow and thick outline."""
+    lines     = hook.split("\n")[:2]
+    max_chars = max(len(l) for l in lines)
+
+    if max_chars <= 9:
+        size = 118
+    elif max_chars <= 13:
+        size = 98
+    else:
+        size = 82
+
+    font    = _font("impact.ttf", size)
+    line_h  = int(size * 1.18)
+    total_h = len(lines) * line_h
+    start_y = H // 2 - total_h // 2 + 22
+    cx      = int(W * 0.24)
+
+    for i, line in enumerate(lines):
+        y = start_y + i * line_h
+
+        # Glow layer
+        glow_col   = (190, 0, 0, 50) if i == 0 else (255, 255, 255, 38)
+        glow_layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+        gd         = ImageDraw.Draw(glow_layer)
+        for dx in (-10, -5, 0, 5, 10):
+            for dy in (-10, -5, 0, 5, 10):
+                gd.text((cx + dx, y + dy), line, font=font,
+                        fill=glow_col, anchor="mm")
+        glow_layer = glow_layer.filter(ImageFilter.GaussianBlur(radius=11))
+        bg = Image.alpha_composite(bg.convert("RGBA"), glow_layer).convert("RGB")
+
+        # Outline + main text
+        draw = ImageDraw.Draw(bg)
+        ow   = 7
+        for dx in range(-ow, ow + 1):
+            for dy in range(-ow, ow + 1):
+                if dx != 0 or dy != 0:
+                    draw.text((cx + dx, y + dy), line, font=font,
+                              fill=(0, 0, 0), anchor="mm")
+        main_col = (255, 255, 255) if i == 0 else (255, 18, 18)
+        draw.text((cx, y), line, font=font, fill=main_col, anchor="mm")
+
+    return bg
+
+
+def _draw_bottom_bar(draw: ImageDraw.Draw, W: int, H: int) -> None:
+    y = H - 64
+    draw.rectangle([0, y, W, H], fill=(12, 0, 2))
+    draw.rectangle([0, y, W, y + 3], fill=(175, 0, 0))
+    font = _font("arialbd.ttf", 31)
+    text = "KWENTONG MULTO   •   Mag-Subscribe para sa Bagong Kwento"
+    bbox = draw.textbbox((0, 0), text, font=font)
+    draw.text(((W - (bbox[2] - bbox[0])) // 2, y + 15), text,
+              fill=(195, 175, 175), font=font)
 
 
 # ── Font helpers ──────────────────────────────────────────────────────────────
 
-_THUMB_LINUX_FONT_MAP = {
-    "impact.ttf":   ["LiberationSans-Bold.ttf",    "DejaVuSans-Bold.ttf"],
-    "arialbd.ttf":  ["LiberationSans-Bold.ttf",    "DejaVuSans-Bold.ttf"],
-    "arial.ttf":    ["LiberationSans-Regular.ttf", "DejaVuSans.ttf"],
+_LINUX_FONT_MAP = {
+    "impact.ttf":  ["LiberationSans-Bold.ttf", "DejaVuSans-Bold.ttf"],
+    "arialbd.ttf": ["LiberationSans-Bold.ttf", "DejaVuSans-Bold.ttf"],
+    "arial.ttf":   ["LiberationSans-Regular.ttf", "DejaVuSans.ttf"],
 }
-_THUMB_LINUX_FONT_DIRS = [
+_LINUX_DIRS = [
     "/usr/share/fonts/truetype/liberation/",
     "/usr/share/fonts/truetype/dejavu/",
     "/usr/share/fonts/truetype/",
 ]
 
 
-def _font(name: str, size: int) -> "ImageFont.FreeTypeFont":
+def _font(name: str, size: int) -> ImageFont.FreeTypeFont:
     candidates = [
         name,
         f"C:\\Windows\\Fonts\\{name}",
         f"/System/Library/Fonts/{name}",
         f"/usr/share/fonts/truetype/msttcorefonts/{name}",
     ]
-    for lname in _THUMB_LINUX_FONT_MAP.get(name.lower(), []):
-        for d in _THUMB_LINUX_FONT_DIRS:
+    for lname in _LINUX_FONT_MAP.get(name.lower(), []):
+        for d in _LINUX_DIRS:
             candidates.append(f"{d}{lname}")
     for path in candidates:
         try:
@@ -196,132 +484,3 @@ def _font(name: str, size: int) -> "ImageFont.FreeTypeFont":
         except Exception:
             pass
     return ImageFont.load_default()
-
-
-def _outlined_text(draw, xy, text, font, fill, outline=(0, 0, 0), ow=5, anchor="mm"):
-    """Draw text with thick black outline — visible over any background."""
-    x, y = xy
-    for dx in range(-ow, ow + 1):
-        for dy in range(-ow, ow + 1):
-            if dx or dy:
-                draw.text((x + dx, y + dy), text, font=font, fill=outline, anchor=anchor)
-    draw.text((x, y), text, font=font, fill=fill, anchor=anchor)
-
-
-# ── Text content ──────────────────────────────────────────────────────────────
-
-def _make_thumbnail_text(seed: str) -> str:
-    """Convert long story seed into 4-6 word punchy thumbnail text (2 short lines)."""
-    s = seed.lower().replace("aita for ", "").replace("aita ", "").strip()
-
-    patterns = [
-        # specific first (more precise keyword matches)
-        (["tacky", "embarrass"],                    "SHE CALLED IT\nTACKY"),
-        (["wedding", "venue"],                      "I RUINED\nHER WEDDING?!"),
-        (["wedding", "bride", "ceremony"],          "SHE RUINED\nMY WEDDING"),
-        (["cheating", "affair", "cheated"],         "SHE CAUGHT HIM\nCHEATING"),
-        (["divorce", "separated"],                  "THE DIVORCE\nSHOCKED EVERYONE"),
-        (["fired", "quit", "walked out"],           "I QUIT IN FRONT\nOF EVERYONE"),
-        (["boss", "job", "work", "office"],         "MY BOSS\nHUMILIATED ME"),
-        (["mother-in-law", "mil"],                  "MY MIL\nCROSSED THE LINE"),
-        (["mom", "mother", "stepmom"],              "MY MOM\nBETRAYED ME"),
-        (["sister"],                                "MY SISTER\nDID THE UNTHINKABLE"),
-        (["brother"],                               "MY BROTHER\nCROSSED THE LINE"),
-        (["boyfriend", "girlfriend", "ex"],         "MY EX\nRUINED EVERYTHING"),
-        (["husband"],                               "MY HUSBAND'S\nSECRET"),
-        (["wife"],                                  "SHE HID THIS\nFROM ME"),
-        (["money", "cash", "stole", "loan"],        "SHE TOOK\nEVERYTHING"),
-        (["party", "invite", "birthday"],           "THEY DIDN'T\nINVITE ME"),
-        (["secret", "lied", "truth", "hiding"],     "THE TRUTH\nCAME OUT"),
-        (["kicked out", "homeless", "evict"],       "THEY KICKED\nME OUT"),
-        (["baby", "pregnant", "child", "kid"],      "SHE HID\nTHE PREGNANCY"),
-        (["inheritance", "will", "estate"],         "THEY STOLE\nMY INHERITANCE"),
-        (["family"],                                "MY FAMILY\nIS DIVIDED"),
-    ]
-    for keywords, text in patterns:
-        if any(k in s for k in keywords):
-            return text
-
-    # Fallback: extract first ~8 meaningful words, split into 2 lines
-    words = s.rstrip("?!.").split()[:8]
-    mid = max(2, len(words) // 2)
-    return " ".join(words[:mid]).upper() + "\n" + " ".join(words[mid:]).upper()
-
-
-# ── Drawing functions ─────────────────────────────────────────────────────────
-
-def _draw_aita_badge(draw, W: int):
-    """Large red AITA? badge — top left, unmissable."""
-    font = _font("impact.ttf", 78)
-    text = "AITA?"
-    bbox = draw.textbbox((0, 0), text, font=font)
-    tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
-    pad = 16
-    x1, y1 = 16, 16
-    x2, y2 = x1 + tw + pad * 2, y1 + th + pad
-    draw.rectangle([x1, y1, x2, y2], fill=(210, 15, 15))
-    draw.rectangle([x1, y1, x2, y2], outline=(255, 70, 70), width=3)
-    draw.text((x1 + pad, y1 + pad // 2), text, fill="white", font=font)
-
-
-def _draw_main_text(draw, thumb_text: str, W: int, H: int):
-    """Massive 2-line punchy text — Impact font, black outline, left side of frame."""
-    lines = thumb_text.split("\n")[:2]
-
-    # Impact is the viral thumbnail font (used by every top AITA channel)
-    font_xl = _font("impact.ttf", 118)
-    font_l  = _font("impact.ttf", 95)
-    font_m  = _font("impact.ttf", 82)
-
-    max_chars = max(len(l) for l in lines)
-    if max_chars <= 10:
-        font = font_xl
-    elif max_chars <= 14:
-        font = font_l
-    else:
-        font = font_m
-
-    line_h = int(font.size * 1.10) if hasattr(font, 'size') else 110
-
-    # Position: center of left 55% of image, vertically centered
-    cx = int(W * 0.28)
-    total_h = len(lines) * line_h
-    start_y = H // 2 - total_h // 2 + 20   # slight downward bias
-
-    for i, line in enumerate(lines):
-        y = start_y + i * line_h
-        color = (255, 255, 255) if i == 0 else (255, 220, 30)   # white line 1, gold line 2
-        _outlined_text(draw, (cx, y), line, font, fill=color, outline=(0, 0, 0), ow=6)
-
-
-def _draw_starburst(draw, W: int):
-    """Starburst badge top-right — 'OMG' shock reaction."""
-    cx, cy = W - 108, 115
-    r_outer, r_inner, spikes = 100, 62, 10
-    points = []
-    for i in range(spikes * 2):
-        angle = math.pi * i / spikes - math.pi / 2
-        r = r_outer if i % 2 == 0 else r_inner
-        points.append((cx + r * math.cos(angle), cy + r * math.sin(angle)))
-    draw.polygon(points, fill=(215, 0, 0))
-    draw.ellipse((cx - 55, cy - 55, cx + 55, cy + 55), fill=(175, 0, 0))
-
-    font_big = _font("impact.ttf", 42)
-    font_sm  = _font("impact.ttf", 26)
-    draw.text((cx, cy - 16), "OMG", fill="white", font=font_big, anchor="mm")
-    draw.text((cx, cy + 18), "NO WAY", fill=(255, 220, 30), font=font_sm, anchor="mm")
-
-
-def _draw_bottom_bar(draw, W: int, H: int):
-    y = H - 76
-    draw.rectangle([0, y, W, H], fill=(185, 12, 12))
-    font = _font("arialbd.ttf", 35)
-    text = "DRAMA DESK   |   DROP YOUR VERDICT IN THE COMMENTS"
-    bbox = draw.textbbox((0, 0), text, font=font)
-    draw.text(((W - (bbox[2] - bbox[0])) // 2, y + 18), text, fill="white", font=font)
-
-
-def _draw_border(draw, W: int, H: int):
-    b = 10
-    for rect in [(0, 0, W, b), (0, H - b, W, H), (0, 0, b, H), (W - b, 0, W, H)]:
-        draw.rectangle(rect, fill=(255, 0, 0))

@@ -34,19 +34,23 @@ def main():
 
     # Load existing token if available
     if os.path.exists(TOKEN_FILE):
-        with open(TOKEN_FILE) as f:
-            data = json.load(f)
-        with open(CREDS_FILE) as f:
-            cred_data = json.load(f)
-        installed = cred_data.get("installed", cred_data.get("web", {}))
-        creds = google.oauth2.credentials.Credentials(
-            token=data.get("token"),
-            refresh_token=data.get("refresh_token"),
-            token_uri=installed.get("token_uri"),
-            client_id=installed.get("client_id"),
-            client_secret=installed.get("client_secret"),
-            scopes=SCOPES,
-        )
+        try:
+            with open(TOKEN_FILE) as f:
+                data = json.load(f)
+        except (json.JSONDecodeError, ValueError):
+            data = {}
+        if data.get("token") or data.get("refresh_token"):
+            with open(CREDS_FILE) as f:
+                cred_data = json.load(f)
+            installed = cred_data.get("installed", cred_data.get("web", {}))
+            creds = google.oauth2.credentials.Credentials(
+                token=data.get("token"),
+                refresh_token=data.get("refresh_token"),
+                token_uri=installed.get("token_uri"),
+                client_id=installed.get("client_id"),
+                client_secret=installed.get("client_secret"),
+                scopes=SCOPES,
+            )
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:

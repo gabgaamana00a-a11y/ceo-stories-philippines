@@ -1,9 +1,10 @@
 """
-script_writer.py — Generate original multi-voice drama scripts via OpenRouter.
+script_writer.py — Generate original multi-voice Tagalog horror scripts via OpenRouter.
 
-Niche: AITA / Reddit relationship drama (US audience, 18-45)
-Format: Radio-drama style with [SPEAKER] tags, 700-1200 words (~5-9 min read)
-Model: Claude 3.5 Sonnet via OpenRouter (best creative writing quality)
+Niche: Filipino horror & supernatural stories (Filipino audience, 18-45)
+Format: Radio-drama style with [SPEAKER] tags, 900-1400 words (~8-12 min read)
+Language: Tagalog (Filipino) with natural spoken expressions
+Model: Gemini / Claude via OpenRouter
 """
 
 import os
@@ -15,96 +16,98 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ── System prompt ─────────────────────────────────────────────────────────────
-_SYSTEM_PROMPT = """You are a viral script writer for "Drama Desk," a YouTube channel covering real-life American drama stories. Your scripts must keep viewers watching for the FULL video. Top channels like this get 10M+ views because the scripts are irresistible.
+_SYSTEM_PROMPT = """Ikaw ay isang viral na manunulat ng script para sa "Kwentong Multo," isang YouTube channel na nagkukuwento ng mga kakaibang karanasan ng mga Pilipino — multo, aswang, engkanto, at iba pang hindi maipaliwanag na bagay. Ang iyong mga script ay dapat mapanatili ang mga manonood na nanonood hanggang sa katapusan ng video.
 
-TARGET AUDIENCE: US adults 18-45. They scroll fast. You have 8 seconds to hook them or they're gone.
+TARGET AUDIENCE: Mga Filipino adults 18-45 sa Pilipinas at sa buong mundo (OFW, diaspora). Palaging nag-iiscroll. Walo lang ang segundo mo para mahuli ang kanilang atensyon.
 
-SPEAKER TAGS — use ONLY these, exactly as written:
-  [NARRATOR]     — The host. Warm, reactive, feels like a best friend spilling tea.
-  [OP]           — The original poster (female stories). Use for EVERY OP line, including dialogue exchanges.
-  [OP_MALE]      — The original poster (male stories). Use for EVERY OP line, including dialogue exchanges.
-  [CHARACTER_F]  — Primary female character (use her real American name in the text)
-  [CHARACTER_M]  — Primary male character (use his real American name in the text)
-  [CHARACTER_F2] — Secondary female character (only if needed)
-  [CHARACTER_M2] — Secondary male character (only if needed)
+SPEAKER TAGS — gamitin LAMANG ang mga ito, eksaktong nakasulat:
+  [NARRATOR]     — Ang tagapagsalaysay. Mainit, nakakakilig, parang kaibigan na nagkukwento.
+  [OP]           — Ang nagkukwento (babae). Gamitin para sa BAWAT linya ng OP, kasama ang mga diyalogo.
+  [OP_MALE]      — Ang nagkukwento (lalaki). Gamitin para sa BAWAT linya ng OP, kasama ang mga diyalogo.
+  [CHARACTER_F]  — Pangunahing babaeng karakter (gamitin ang kanyang totoong pangalan sa teksto)
+  [CHARACTER_M]  — Pangunahing lalaking karakter (gamitin ang kanyang totoong pangalan sa teksto)
+  [CHARACTER_F2] — Pangalawang babaeng karakter (kung kailangan lamang)
+  [CHARACTER_M2] — Pangalawang lalaking karakter (kung kailangan lamang)
 
-FORBIDDEN — NEVER use these tags: [HER] [HIM] [SHE] [HE] [THEM] [FRIEND] [MOM] [DAD] [SIS] [BRO]
-Each person MUST have their own unique tag from the list above.
+BAWAL — HUWAG KAILANMAN gamitin ang mga ito: [SIYA] [SILA] [KAIBIGAN] [INA] [AMA] [ATE] [KUYA]
+Ang bawat tao ay DAPAT may sariling natatanging tag mula sa listahan sa itaas.
 
-CORRECT example of a dialogue exchange:
-[OP] So I walked up to her and said — are you serious right now?
-[CHARACTER_F] I'm serious. You had no right to say that.
-[OP] I had every right! You asked for my opinion.
-[CHARACTER_F] I asked you to be supportive, not brutal.
+TAMANG halimbawa ng dialogue exchange:
+[OP] Lumingon ako sa kanya at sinabi ko — totoo ba ito?
+[CHARACTER_F] Totoo. Hindi ako nagbibiro sa iyo.
+[OP] Pero paano? Sinabi mo na...
+[CHARACTER_F] Alam ko ang sinabi ko. Ngunit nakita ko ito ng sarili kong mata.
 
-WRONG (never do this):
-[HER] She said something.
-[HIM] He replied.
+MALI (huwag gawin ito):
+[SIYA] Sinabi niya iyon.
+[ATE] Sumagot ang ate ko.
 
-═══ VIRAL HOOK FORMULA (NON-NEGOTIABLE) ═══
+═══ VIRAL HORROR HOOK FORMULA (HINDI MAAARING BAGUHIN) ═══
 
-STRUCTURE — follow this EXACTLY:
+STRUCTURE — sundin ito EKSAKTONG:
 
-STEP 1 — [NARRATOR] COLD OPEN (first 10 seconds, most shocking moment first):
-  Start with the SINGLE most shocking/outrageous moment from the story as a teaser.
-  Examples: "She handed me a bill for MY OWN birthday dinner." / "He showed up at my job. My BOSS's office."
-  Then say: "Let me explain how we got there."
-  THIS IS THE MOST IMPORTANT PART. Make it impossible to click away.
+HAKBANG 1 — [NARRATOR] COLD OPEN (unang 10 segundo, pinaka-nakakatakot na sandali muna):
+  Simulan sa PINAKA-NAKAGUGULAT o nakakatakot na sandali ng kwento bilang teaser.
+  Halimbawa: "Nandoon pa rin siya. Sa sulok. Tumingin sa akin. Kahit tatlong taon na siyang patay."
+  Pagkatapos sabihin: "Hayaan ninyo akong ikuwento kung paano nagsimula ang lahat."
+  ITO ANG PINAKA-MAHALAGANG BAHAGI. Imposibleng mag-click away.
 
-STEP 2 — [OP] Setup (first-person, 2-3 paragraphs, specific details):
-  Real American name, specific age, specific city/setting, real emotional stakes.
-  End with: a line that signals something is ABOUT to go wrong.
+HAKBANG 2 — [OP] Setup (first-person, 2-3 talata, may mga tiyak na detalye):
+  Totoong pangalan ng lugar sa Pilipinas, tiyak na edad, tiyak na setting, tunay na emosyonal na stakes.
+  Tapusin sa: isang linyang nagpapahiwatig na may MALAPIT NANG MANGYARING masama.
 
-STEP 3 — [NARRATOR] Bridge:
-  "And here's where things start to unravel..."
-  Set up the conflict. Build suspense. Add a mid-story CTA:
-  "Leave a 🔥 if you've been in a situation like this — because it's about to get WORSE."
+HAKBANG 3 — [NARRATOR] Bridge:
+  "At dito nagsimulang maging kakaiba ang lahat..."
+  I-set up ang conflict. Bumuo ng suspense. Magdagdag ng mid-story CTA:
+  "Mag-comment ng 😱 kung naniniwala kayo sa mga ganitong kwento — dahil lalala pa ito."
 
-STEP 4 — Dialogue exchange (at least 5 back-and-forth lines):
-  Raw, realistic, emotionally charged. Real names. Real anger or hurt. No formal language.
+HAKBANG 4 — Dialogue exchange (hindi bababa sa 5 linya ng pabalik-balik):
+  Raw, makatotohanan, puno ng takot o pangamba. Totoong pangalan. Hindi pormal na salita.
 
-STEP 5 — [NARRATOR] Stakes raiser (mid-video retention hook):
-  React to the dialogue like a shocked friend. Then add:
-  "And trust me — I need you to stay for what happens NEXT. Because this is where it gets unreal."
+HAKBANG 5 — [NARRATOR] Stakes raiser (mid-video retention hook):
+  Mag-react tulad ng nagulat na kaibigan. Pagkatapos magdagdag ng:
+  "At magtiwala kayo — kailangan ninyong manatili para sa susunod na mangyayari. Dahil dito talagang nagiging hindi kapani-paniwala."
 
-STEP 6 — [OP/OP_MALE] Confrontation or Reveal:
-  The moment of maximum tension. The thing the cold open teased.
+HAKBANG 6 — [OP/OP_MALE] Confrontation o Reveal:
+  Ang sandali ng pinaka-matinding takot. Ang bagay na itinanong ng cold open.
 
-STEP 7 — More dialogue — the explosive climax exchange (at least 4 more lines):
-  This should feel like a scene from a movie. Raw, real, devastating.
+HAKBANG 7 — Higit pang diyalogo — ang explosive climax exchange (hindi bababa sa 4 pang linya):
+  Dapat parang eksena mula sa pelikula. Raw, totoo, nakakakilig.
 
-STEP 8 — [OP/OP_MALE] Aftermath:
-  Emotional fallout. What they did next. What they're still feeling.
+HAKBANG 8 — [OP/OP_MALE] Aftermath:
+  Emosyonal na kahihinatnan. Ano ang ginawa nila pagkatapos. Ano pa rin ang nararamdaman nila.
 
-STEP 9 — [NARRATOR] Closing verdict:
-  Recap both sides fairly. Then: "So — who's really in the wrong here? Team [OP name], drop a ❤️. Think she went too far? Drop a 💀. And I'll read the top comments in my next video. Drop a comment — who do YOU think is in the wrong here?"
+HAKBANG 9 — [NARRATOR] Pagtatapos:
+  I-recap ang dalawang panig nang patas. Pagkatapos: "Kaya — totoo ba ito o kathang-isip lamang? I-comment ang inyong mga nararamdaman. At kung may sarili kayong karanasan tulad nito — ibahagi ninyo sa comments. Mag-subscribe para sa bagong kwento araw-araw."
 
-═══ RULES ═══
-- Write 950-1200 words total
-- Natural spoken American English — contractions, "y'all", "honestly", "okay so", casual fillers
-- Specific American details: dollar amounts, cities, ages, family roles — makes it feel REAL
-- Every 60-90 seconds of listening, there must be a new hook or revelation to reset attention
-- Emotion > information. We want viewers FEELING things, not just listening.
-- ONLY output the script. No title. No preamble. No markdown. No stage directions. No asterisks.
-- Start immediately with [NARRATOR]
-- End the last [NARRATOR] line with: "Drop a comment — who do YOU think is in the wrong here?"
+═══ MGA PATAKARAN ═══
+- Sumulat ng 950-1400 salita sa kabuuan
+- Natural na Tagalog — mga salitang ginagamit sa araw-araw, contraction, casual na ekspresyon
+- Mga tiyak na detalyeng Filipino: pangalan ng lugar, edad, trabaho, pamilyang dynamics — para parang totoo
+- Tuwing 60-90 segundo ng pakikinig, dapat may bagong hook o revelation para i-reset ang atensyon
+- Emosyon > impormasyon. Gusto naming MARAMDAMAN ng mga manonood, hindi lang makinig.
+- I-OUTPUT LAMANG ANG SCRIPT. Walang pamagat. Walang paunang salita. Walang markdown. Walang stage directions. Walang asterisk.
+- Magsimula agad sa [NARRATOR]
+- Tapusin ang huling [NARRATOR] na linya sa: "Mag-subscribe para sa bagong kwento araw-araw."
 """
 
 # ── Niche-specific prompt boosts ──────────────────────────────────────────────
 _NICHE_CONTEXT = """
-SPECIFIC DRAMA NICHES WE COVER (rotate naturally based on the story seed):
-• AITA stories — "Am I wrong for..." dilemmas with clear moral conflict
-• Relationship betrayal — cheating, lying, hidden secrets between partners
-• Family drama — in-law conflicts, sibling rivalry, inheritance disputes, estrangement
-• Entitled people — Karen moments, demanding relatives, boundary violations
-• Workplace drama — toxic bosses, credit theft, HR incidents, office politics
-• Friendship betrayal — best friends crossing lines, loyalty tested
+MGA TIYAK NA HORROR NICHE NA AMING TINATAKPAN (i-rotate nang natural batay sa story seed):
+• Aswang at folklore — manananggal, tikbalang, kapre, sigbin, berberoka, dwende
+• Engkanto at espiritu — engkanto, diwata, nimpa, mga espiritu ng kalikasan
+• Multo at patay — white lady, multo sa bahay, multo na hindi alam na patay
+• OFW horror — karanasan ng mga Pilipino sa ibang bansa na hindi maipaliwanag
+• Paaralan — multo sa eskwelahan, kaklaseng hindi totoo, gusaling may naninirahan
+• Ospital — pasyenteng hindi naka-admit, nurse na nakakarinig ng hindi naririnig
+• Probinsya — baryo na may lihim, aswang na kapit-bahay, ritwal ng pamilya
+• Urban legend — Metro Manila, Cebu, at iba pang lungsod na may kwento
 
-US CULTURAL CONTEXT:
-- Set stories in recognizable American settings: suburban homes, restaurants,
-  offices, family holiday dinners, wedding venues, airports, etc.
-- Reference realistic American salaries, family dynamics, and social situations
-- The audience identifies with the OP — make them sympathetic but not perfect
+FILIPINO CULTURAL CONTEXT:
+- Itakda ang mga kwento sa mga kilalang lugar ng Pilipinas: probinsya ng Capiz, Balete Drive,
+  lumang ospital, bahay na minana, eskwelahang gothic, baryo sa Visayas, atbp.
+- Gamitin ang mga tunay na Filipino na pangalan at lugar para parang totoo
+- Ang mga manonood ay nagtatanda ng mga katulad nilang karanasan — gawin silang maramdaman ito
 """
 
 
@@ -118,18 +121,20 @@ _VALID_TAGS = {
 
 # Map any stray LLM-generated tags → nearest valid tag
 _TAG_REMAP = {
+    "SIYA":       "CHARACTER_F",
+    "SILA":       "CHARACTER_F2",
+    "INA":        "CHARACTER_F",
+    "AMA":        "CHARACTER_M",
+    "ATE":        "CHARACTER_F",
+    "KUYA":       "CHARACTER_M",
+    "KAIBIGAN":   "CHARACTER_F2",
+    "LOLA":       "CHARACTER_F",
+    "LOLO":       "CHARACTER_M",
+    "NANAY":      "CHARACTER_F",
+    "TATAY":      "CHARACTER_M",
     "HER":        "CHARACTER_F",
     "HIM":        "CHARACTER_M",
-    "SHE":        "CHARACTER_F",
-    "HE":         "CHARACTER_M",
-    "MOM":        "CHARACTER_F",
-    "DAD":        "CHARACTER_M",
-    "SIS":        "CHARACTER_F",
-    "BRO":        "CHARACTER_M",
     "FRIEND":     "CHARACTER_F2",
-    "HER_FRIEND": "CHARACTER_F2",
-    "HIS_FRIEND": "CHARACTER_M2",
-    "THEM":       "CHARACTER_F2",
 }
 
 
@@ -146,26 +151,26 @@ def _normalize_speaker_tags(script: str) -> str:
 
 
 def generate_drama_script(story_seed: str) -> str:
-    """Generate a full multi-voice drama script from a story seed."""
+    """Generate a full multi-voice Tagalog horror script from a story seed."""
     api_key = os.getenv("OPENROUTER_API_KEY", "")
     if not api_key:
         print("[script] No OPENROUTER_API_KEY — using fallback script")
         return _fallback_script(story_seed)
 
-    user_prompt = f"""Write a full drama script for the following story premise:
+    user_prompt = f"""Sumulat ng buong horror script para sa sumusunod na premisa ng kwento:
 
 "{story_seed}"
 
 {_NICHE_CONTEXT}
 
-Make it feel raw, real, and emotionally charged. Build to a dramatic confrontation or reveal.
-The audience should feel torn — there should be genuine moral complexity.
-End with the narrator asking viewers to comment their verdict."""
+Gawin itong parang totoo, nakakatakot, at puno ng suspense. Bumuo ng takot nang unti-unti.
+Ang manonood ay dapat maramdaman na maaari rin silang mapunta sa sitwasyong ito.
+Tapusin sa tagapagsalaysay na nag-iimbitang mag-comment ang mga manonood."""
 
     models_to_try = [
-        "google/gemini-2.0-flash-lite-001",
-        "anthropic/claude-3-haiku",
+        "google/gemini-2.5-flash",
         "google/gemini-2.0-flash-001",
+        "anthropic/claude-3-haiku",
     ]
 
     for model in models_to_try:
@@ -176,8 +181,8 @@ End with the narrator asking viewers to comment their verdict."""
                     headers={
                         "Authorization": f"Bearer {api_key}",
                         "Content-Type": "application/json",
-                        "HTTP-Referer": "https://youtube.com/@DramaDeskChannel",
-                        "X-Title": "Drama Desk",
+                        "HTTP-Referer": "https://youtube.com/@KwentongMulto",
+                        "X-Title": "Kwentong Multo",
                     },
                     json={
                         "model": model,
@@ -185,8 +190,8 @@ End with the narrator asking viewers to comment their verdict."""
                             {"role": "system", "content": _SYSTEM_PROMPT},
                             {"role": "user",   "content": user_prompt},
                         ],
-                        "max_tokens": 2200,
-                        "temperature": 0.82,
+                        "max_tokens": 2500,
+                        "temperature": 0.85,
                     },
                     timeout=90,
                 )
@@ -211,7 +216,6 @@ End with the narrator asking viewers to comment their verdict."""
                     print("[script] Too short — trying next model")
                     break
 
-                # Sanity check: must have at least one speaker tag
                 if "[NARRATOR]" not in script and "[OP]" not in script:
                     print("[script] Missing speaker tags — trying next model")
                     break
@@ -228,71 +232,83 @@ End with the narrator asking viewers to comment their verdict."""
 
 
 def _fallback_script(story_seed: str) -> str:
-    """Hard-coded fallback so the pipeline never fully breaks."""
+    """Hard-coded Tagalog horror fallback so the pipeline never fully breaks."""
     names = random.choice([
-        ("Sarah", "Jake", "Linda"),
-        ("Ashley", "Ryan", "Karen"),
-        ("Megan", "Chris", "Diane"),
-        ("Jessica", "Matt", "Brenda"),
+        ("Ana", "Marco", "Lola Nena"),
+        ("Maria", "Jose", "Lola Caring"),
+        ("Rosa", "Juan", "Nanay Celia"),
+        ("Clara", "Ramon", "Lola Puring"),
     ])
     op_name, char_m, char_f = names
 
-    return f"""[NARRATOR] Welcome back to Drama Desk — the channel where real life gets messy. \
-Today's story is one that has us absolutely floored, and by the end of this video, \
-I guarantee you will have a very strong opinion. If you are new here, subscribe right now \
-because we drop a fresh drama story every single day.
+    return f"""[NARRATOR] Nandoon pa rin siya. Sa sulok ng kwarto. Nakatingin sa akin. \
+Kahit tatlong taon na siyang patay. Hayaan ninyo akong ikuwento kung paano nagsimula ang lahat.
 
-[OP] Okay, so I really need an outside perspective on this because my entire family is divided, \
-and honestly I am starting to question everything. I am a thirty-one-year-old woman living in \
-suburban Ohio, and I have been with my partner {char_m} for four years. \
-Here is the situation: {story_seed}.
+[OP] Hindi ako naniniwala sa mga multo noon. Bata pa lang ako, lagi akong sinasabihan ng \
+aking {char_f} tungkol sa mga hindi maipaliwanag na bagay sa aming luma naming bahay sa probinsya. \
+Ngunit tulad ng karamihan sa amin, naisip ko na katha-isip lamang iyon ng matatanda. \
+Hanggang sa isang gabi, tatlong taon na ang nakakaraan, natuklasan ko ang totoo. \
+{story_seed}.
 
-[NARRATOR] Now before you jump to conclusions, let me give you the full context. \
-Because this story has layers, and the more you hear, the more complicated it gets.
+[NARRATOR] Para maunawaan ninyo kung bakit ito nakakatakot, kailangan ko munang \
+ibahagi sa inyo ang kasaysayan ng lugar na iyon. Dahil hindi ito nagsimula sa akin. \
+Nagsimula ito matagal na bago ako ipinanganak.
 
-[OP] So it started about three weeks ago. Everything seemed completely normal on the surface. \
-{char_m} and I had just gotten back from a weekend trip to visit his family. \
-His mom {char_f} was perfectly pleasant the whole time — or so I thought.
+[OP] Ang bahay ng aming pamilya sa Batangas ay itinayo ng aking lolo noong dekada sitenta. \
+Mabuting lugar ito noon — malawak na lupa, malapit sa ilog, maraming puno. \
+Ngunit may isang bahagi ng lote na palagi naming iniiwasan. Isang sulok sa likod ng bahay \
+na kahit ang mga hayop ay hindi lumalapitan. Sinabi ng aking {char_f} na may nakabaon doon. \
+Hindi niya sinabi kung ano.
 
-[CHARACTER_F] Oh sweetheart, I just think you should know something. I've been meaning to say this \
-for a while now and I think it's important.
+[CHARACTER_F] {op_name}, huwag kang pupunta sa likod ng bahay. Lalo na kung gabi na. \
+Alam mo na ang sabi ko dito.
 
-[OP] And that is when she dropped it. Right there at the kitchen table, in front of {char_m} \
-and his entire family. My jaw just hit the floor.
+[OP] Lagi ko itong sinusunod noong bata ako. Ngunit nang bumalik ako para alagaan \
+ang bahay pagkatapos mamatay ang aking {char_f}, ay nakalimutan ko na ang babalang iyon.
 
-[CHARACTER_M] Mom — this is not the time for this. Can we please not do this right now?
+[NARRATOR] At dito nagsimulang maging kakaiba ang lahat. Mag-comment ng 😱 \
+kung nararamdaman na ninyo ang pagtaas ng balahibo sa inyong mga braso — \
+dahil lalala pa ito.
 
-[CHARACTER_F] No, she deserves to know. If you will not tell her then I will.
+[CHARACTER_M] {op_name}, may tinanong lang ako sa iyo. Gaano katagal ka na naririto?
 
-[OP] I looked at {char_m} and I could see it on his face immediately. He knew exactly what \
-she was about to say. And in that moment I felt this sick feeling in my stomach, \
-like everything I thought I knew was about to collapse.
+[OP] Sabi ko, isang linggo pa lang. Bakit?
 
-[NARRATOR] And here is where it gets really messy, folks. Because what came out next was not \
-just a surprise — it was a complete rewriting of everything {op_name} had been told.
+[CHARACTER_M] Kasi... nakita kita sa bintana kahapon ng gabi. Mga alas dose ng hatinggabi. \
+Nakatayo ka sa likod ng bahay. Nakatingin sa lupa.
 
-[CHARACTER_F] He was engaged before you. For two years. And he broke it off in the worst possible way.
+[OP] Hindi ako lumabas kahapon ng gabi. Natulog ako nang alas nuwebe.
 
-[OP] I could not even speak. I just sat there completely frozen while {char_m} started trying to explain.
+[NARRATOR] Tumahimik si {char_m} nang marinig niya iyon. At sa kanyang mukha — \
+nakita ko ang isang bagay na hindi ko gustong makita. Takot. \
+Hindi siya nagtitingin sa akin nang normal. Tinitingnan niya ako tulad ng isang tao \
+na hindi sigurado kung ang nakikita niya ay ang taong kakilala niya.
 
-[CHARACTER_M] It was years ago. It has nothing to do with us. I was going to tell you, I just — \
-I did not know how, and then time passed and it felt like it was too late.
+[OP] Pagkatapos ng gabing iyon, nagsimulang mangyari ang mga bagay na hindi ko maintindihan. \
+Ang mga larawan sa dingding ay nakaharap nang kabaligtaran tuwing umaga. \
+Ang mga pinggan ay nasa ibang lugar kaysa inilagay ko. \
+At isang gabi, nang gumising ako sa hatinggabi, may nakita akong nakatayo sa sulok ng aking kwarto.
 
-[OP] Too late? We have been together for four years. We have talked about marriage. \
-And you did not think that was relevant information?
+[CHARACTER_F] Huwag kang matatakot. Nandito lang ako para bantayan ka.
 
-[CHARACTER_F] I am sorry for how this came out, I truly am. But someone had to say something.
+[OP] Ang boses. Ang boses ng aking {char_f}. Na namatay na tatlong taon na ang nakakaraan.
 
-[NARRATOR] So now {op_name} is left trying to figure out whether this is a dealbreaker \
-or whether it is something she can move past. Her friends are split right down the middle. \
-Half of them say {char_m} had every right to keep his past private. \
-The other half say four years in, she deserved to know this from him — not from his mother.
+[NARRATOR] Mga kaibigan, hindi ko alam kung paano ninyo tatanggapin ang susunod na sasabihin ko. \
+Ngunit ito ang totoo. Kinausap ni {op_name} ang kanyang namatay na {char_f} \
+sa loob ng tatlumpung minuto sa gabi na iyon. At ang lahat ng sinabi nito \
+ay mga bagay na hindi posibleng malaman ng kahit sino.
 
-[OP] I do not even know what I am most upset about. Is it the secret itself? \
-Or is it the fact that his mother knew this whole time and was just sitting on it? \
-And why now? Why at a family dinner with everyone watching?
+[OP] Sinabi niya sa akin ang tungkol sa baon sa likod ng bahay. Sinabi niya kung ano ito. \
+At sinabi niya kung bakit hindi ito dapat gambalain. Pero alam ninyo ang pinaka-nakakatakot? \
+Sinabi niya rin kung sino ang nagbaon doon. At ang pangalan na ibinigay niya \
+ay isang pangalan na nakilala ko — dahil iyon ang pangalan ng aking lolo.
 
-[NARRATOR] Alright Drama Desk community — I want to hear from you right now. \
-Was {char_m} wrong for never telling her? Was his mom completely out of line \
-for bringing it up like that? And most importantly — what would YOU do in this situation? \
-Drop a comment — who do YOU think is in the wrong here?"""
+[NARRATOR] Kaya ngayon ay alam na ninyo kung bakit hindi na ako bumalik sa bahay na iyon. \
+At kung bakit, sa tuwing may nagsasabi sa akin na katha-isip lamang ang mga multo — \
+hindi na ako sumasagot. Dahil ang ilan sa atin ay nakaranas na ng mga bagay \
+na hindi kayang ipaliwanag ng agham. At ang ilan sa atin ay hindi na kailangang maniwala — \
+dahil natuklasan na nila ang totoo.
+
+Kung mayroon kayong karanasang katulad nito — o kung nakatira kayo sa lugar \
+na parang may iba ring naninirahan — ibahagi ninyo sa comments. \
+Mag-subscribe para sa bagong kwento araw-araw."""

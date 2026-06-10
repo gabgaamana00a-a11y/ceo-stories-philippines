@@ -1,4 +1,4 @@
-name: Daily Drama Video
+name: Daily Kwentong Multo Video
 
 # ── Triggers ──────────────────────────────────────────────────────────────────
 on:
@@ -25,7 +25,7 @@ permissions:
 # ── Job ───────────────────────────────────────────────────────────────────────
 jobs:
   generate-and-upload:
-    name: Generate + Upload Drama Video
+    name: Generate + Upload Kwentong Multo Video
     runs-on: ubuntu-latest
     timeout-minutes: 90
 
@@ -61,13 +61,14 @@ jobs:
       # ── 5. Write secret files ────────────────────────────────────────────────
       #
       # REQUIRED GitHub Secrets:
-      #   OPENROUTER_API_KEY        — OpenRouter key for script generation
-      #   PEXELS_API_KEY            — Pexels key for free B-roll video
+      #   OPENROUTER_API_KEY        — OpenRouter key for Tagalog horror script generation
+      #   PEXELS_API_KEY            — Pexels key for thumbnail face photos
       #   YOUTUBE_TOKEN_JSON        — Contents of your token.json (OAuth token)
       #   YOUTUBE_CREDENTIALS_JSON  — Contents of your credentials.json (OAuth client)
       #
       # OPTIONAL:
-      #   PIXABAY_API_KEY           — Pixabay fallback B-roll (free)
+      #   TELEGRAM_BOT_TOKEN        — Telegram bot token for upload notifications
+      #   TELEGRAM_CHAT_ID          — Telegram chat/channel ID for notifications
       #
       - name: Write YouTube credentials from secrets
         env:
@@ -78,12 +79,10 @@ jobs:
           echo "$YOUTUBE_CREDENTIALS_JSON" > credentials.json
 
       # ── 6. Run pipeline ──────────────────────────────────────────────────────
-      - name: Generate drama video
+      - name: Generate horror story video
         env:
           OPENROUTER_API_KEY:   ${{ secrets.OPENROUTER_API_KEY }}
           PEXELS_API_KEY:       ${{ secrets.PEXELS_API_KEY }}
-          PIXABAY_API_KEY:      ${{ secrets.PIXABAY_API_KEY }}
-          JAMENDO_CLIENT_ID:    ${{ secrets.JAMENDO_CLIENT_ID }}
           TELEGRAM_BOT_TOKEN:   ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID:     ${{ secrets.TELEGRAM_CHAT_ID }}
         run: |
@@ -99,8 +98,8 @@ jobs:
 
           python main.py $ARGS
 
-      # ── 7. Persist used seed list ────────────────────────────────────────────────────
-      - name: Commit used_topics.json
+      # ── 7. Persist used seed + title lists ──────────────────────────────────────────────
+      - name: Commit used_topics.json and used_titles.json
         if: always()
         continue-on-error: true
         env:
@@ -109,8 +108,8 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git
-          git add used_topics.json || true
-          git diff --cached --quiet || git commit -m "chore: update used_topics.json [skip ci]"
+          git add used_topics.json used_titles.json || true
+          git diff --cached --quiet || git commit -m "chore: update topic/title history [skip ci]"
           git push
 
       # ── 8. Save artifact ─────────────────────────────────────────────────────────────

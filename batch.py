@@ -1,109 +1,56 @@
-import asyncio
-import json
-import os
-from datetime import datetime, timedelta
-from main import get_topic, create_single_short
+"""
+batch.py — Batch runner for Kwentong Multo.
 
-BATCH_CONFIG = {
-    "videos_per_day": 3,
-    "niche": "math_quiz",
-    "upload": True,
-    "delay_between": 30,
-}
+Generates multiple horror story videos in sequence (no upload by default).
+Usage:
+    python batch.py              # generates 3 videos, no upload
+    python batch.py --count 5    # generates 5 videos
+    python batch.py --upload     # generates + uploads to YouTube
+"""
+
+import argparse
+import sys
+import time
+from main import create_drama_video
 
 
-async def run_batch(count: int = 3, niche: str = "finance",
-                    upload: bool = True, delay: int = 30):
-    print(f"\nBATCH YOUTUBE SHORTS CREATOR")
-    print(f"Videos: {count} | Niche: {niche}\n")
+def run_batch(count: int = 3, upload: bool = False, delay: int = 15) -> None:
+    print(f"\n{'='*60}")
+    print(f"  KWENTONG MULTO — Batch Generator")
+    print(f"  Videos: {count} | Upload: {upload} | Delay: {delay}s")
+    print(f"{'='*60}\n")
+
     results = []
-    failed = []
-    used_topics = _load_used_topics()
-    topics = []
-    for _ in range(count * 3):
-        topic = get_topic(niche)
-        if topic not in used_topics and topic not in topics:
-            topics.append(topic)
-        if len(topics) >= count:
-            break
-    print("Topics for today:")
-    for i, t in enumerate(topics, 1):
-        print(f"  {i}. {t}")
-    print()
-    for i, topic in enumerate(topics, 1):
-        print(f"\nCreating video {i}/{count}...")
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_dir = f"output/batch_{timestamp}_{i}"
+    failed  = []
+
+    for i in range(1, count + 1):
+        print(f"\n[Batch {i}/{count}] Starting video generation...")
         try:
-            result = await create_single_short(
-                topic=topic, niche=niche, output_dir=output_dir, upload=upload
-            )
+            result = create_drama_video(upload=upload)
             results.append(result)
-            _save_used_topic(topic)
-            print(f"Video {i}/{count} complete!")
-            if upload and i < count:
-                print(f"Waiting {delay}s before next upload...")
-                await asyncio.sleep(delay)
+            print(f"[Batch {i}/{count}] Done → {result.get('video_path', '?')}")
+            if i < count:
+                print(f"[Batch] Waiting {delay}s before next video...")
+                time.sleep(delay)
         except Exception as e:
-            print(f"Video {i} failed: {e}")
-            failed.append({"topic": topic, "error": str(e)})
-    _print_summary(results, failed)
-    _save_batch_log(results, failed)
-    return results
+            print(f"[Batch {i}/{count}] FAILED: {e}")
+            failed.append({"index": i, "error": str(e)})
 
-
-def _load_used_topics() -> set:
-    path = os.path.join(os.path.dirname(__file__), "used_topics.json")
-    if os.path.exists(path):
-        with open(path) as f:
-            data = json.load(f)
-        cutoff = (datetime.now() - timedelta(days=30)).isoformat()
-        return {item["topic"] for item in data if item.get("date", "") > cutoff}
-    return set()
-
-
-def _save_used_topic(topic: str):
-    path = os.path.join(os.path.dirname(__file__), "used_topics.json")
-    data = []
-    if os.path.exists(path):
-        with open(path) as f:
-            data = json.load(f)
-    data.append({"topic": topic, "date": datetime.now().isoformat()})
-    with open(path, "w") as f:
-        json.dump(data, f, indent=2)
-
-
-def _print_summary(results, failed):
-    print(f"\nSummary: {len(results)} successful, {len(failed)} failed")
-    for r in results:
-        print(f"  {r['topic'][:40]}")
-        if r.get("url"):
-            print(f"  {r['url']}")
-
-
-def _save_batch_log(results, failed):
-    log = {
-        "date": datetime.now().isoformat(),
-        "successful": len(results),
-        "failed": len(failed),
-        "videos": results,
-        "errors": failed
-    }
-    os.makedirs("logs", exist_ok=True)
-    log_file = f"logs/batch_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-    with open(log_file, "w") as f:
-        json.dump(log, f, indent=2, default=str)
-    print(f"Log saved: {log_file}")
+    # Summary
+    print(f"\n{'='*60}")
+    print(f"  BATCH COMPLETE")
+    print(f"  Success: {len(results)}/{count}")
+    if failed:
+        print(f"  Failed:  {len(failed)}/{count}")
+        for f in failed:
+            print(f"    [{f['index']}] {f['error']}")
+    print(f"{'='*60}\n")
 
 
 if __name__ == "__main__":
-    # Allow GitHub Actions (or any CI) to override niche/count via env vars
-    _niche = os.getenv("CHANNEL_NICHE", BATCH_CONFIG["niche"])
-    _count = int(os.getenv("CHANNEL_COUNT", BATCH_CONFIG["videos_per_day"]))
-    _upload = os.getenv("CHANNEL_UPLOAD", str(BATCH_CONFIG["upload"])).lower() != "false"
-    asyncio.run(run_batch(
-        count=_count,
-        niche=_niche,
-        upload=_upload,
-        delay=BATCH_CONFIG["delay_between"]
-    ))
+    parser = argparse.ArgumentParser(description="Kwentong Multo batch video generator")
+    parser.add_argument("--count",  type=int, default=3,    help="Number of videos to generate")
+    parser.add_argument("--upload", action="store_true",    help="Upload to YouTube after rendering")
+    parser.add_argument("--delay",  type=int, default=15,   help="Seconds to wait between videos")
+    args = parser.parse_args()
+    run_batch(count=args.count, upload=args.upload, delay=args.delay)

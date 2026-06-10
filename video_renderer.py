@@ -20,7 +20,8 @@ import shutil
 import textwrap
 import requests
 import imageio_ffmpeg
-from PIL import Image, ImageDraw, ImageFont
+import math
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 from config import VIDEO_WIDTH, VIDEO_HEIGHT, VIDEO_FPS, SCENE_KEYWORDS
 
@@ -318,11 +319,11 @@ def write_ass_subtitles(captions: list, segments: list, ass_path: str) -> str:
     return ass_path
 
 
-# ── Reddit-style PIL renderer ─────────────────────────────────────────────────
+# ── Horror-style PIL renderer ────────────────────────────────────────────────
 #
-# Mimics top AITA/Reddit drama channels:
-#   • NARRATOR/OP segments → Reddit dark-mode post card (like a screenshot)
-#   • Dialogue segments    → Chat bubbles with speaker color + history
+# Filipino horror story layout:
+#   • NARRATOR/OP segments → Dark story card with blood-red accents
+#   • Dialogue segments    → Horror chat bubbles with speaker color + history
 # No B-roll downloads needed — renders instantly.
 
 _MONOLOGUE_SPEAKERS = {"NARRATOR", "OP", "OP_MALE"}
@@ -342,17 +343,17 @@ _SPEAKER_COLORS = {
 }
 
 _LABEL_MAP = {
-    "NARRATOR":     "Narrator",
-    "OP":           "OP  (Original Poster)",
-    "OP_MALE":      "OP  (Original Poster)",
-    "HER":          "Her",
-    "HIM":          "Him",
-    "HER FRIEND":   "Their Friend",
-    "HIS FRIEND":   "Their Friend",
-    "CHARACTER_F":  "Her",
-    "CHARACTER_M":  "Him",
-    "CHARACTER_F2": "Her Friend",
-    "CHARACTER_M2": "His Friend",
+    "NARRATOR":     "Tagapagsalaysay",
+    "OP":           "Kwentista",
+    "OP_MALE":      "Kwentista",
+    "HER":          "Siya",
+    "HIM":          "Siya",
+    "HER FRIEND":   "Kaibigan",
+    "HIS FRIEND":   "Kaibigan",
+    "CHARACTER_F":  "Siya",
+    "CHARACTER_M":  "Siya",
+    "CHARACTER_F2": "Kaibigan",
+    "CHARACTER_M2": "Kaibigan",
 }
 
 
@@ -395,19 +396,90 @@ def _speaker_color(speaker: str) -> tuple:
     return (150, 150, 150)
 
 
-def _draw_reddit_header(draw, W: int, font) -> None:
-    """Orange top-bar with r/AmItheAsshole branding."""
-    draw.rectangle([0, 0, W, 82], fill=(162, 35, 5))
-    draw.rectangle([0, 82, W, 87], fill=(255, 75, 18))
-    draw.text((28, 18), "r/AmItheAsshole  •  Drama Desk",
-              fill=(255, 220, 195), font=font)
-    draw.text((W - 455, 18), "Drop your verdict below \u2193",
-              fill=(255, 170, 125), font=font)
+# ── Horror visual effects ─────────────────────────────────────────────────────
+
+def _apply_vignette(img: Image.Image, intensity: float = 0.75) -> Image.Image:
+    """Add dark edge vignette with blood-red corner bleed."""
+    W, H  = img.size
+    half  = min(W, H) // 2
+    vign  = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    d     = ImageDraw.Draw(vign)
+    steps = 80
+    for i in range(steps):
+        t      = i / steps
+        margin = int(t * half * 0.90)
+        if W - 2 * margin < 2 or H - 2 * margin < 2:
+            break
+        alpha    = int(intensity * 255 * (t ** 1.6))
+        red_tint = int(30 * (1 - t))
+        d.rectangle([margin, margin, W - margin - 1, H - margin - 1],
+                    outline=(red_tint, 0, 0, max(0, min(alpha, 255))), width=2)
+    return Image.alpha_composite(img.convert("RGBA"), vign).convert("RGB")
+
+
+def _apply_scanlines(img: Image.Image, alpha: int = 18) -> Image.Image:
+    """Subtle horizontal scanlines for CRT/found-footage feel."""
+    W, H = img.size
+    scan = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    d    = ImageDraw.Draw(scan)
+    for y in range(0, H, 4):
+        d.line([(0, y), (W, y)], fill=(0, 0, 0, alpha))
+    return Image.alpha_composite(img.convert("RGBA"), scan).convert("RGB")
+
+
+def _apply_film_grain(img: Image.Image, frame_idx: int, strength: int = 14) -> Image.Image:
+    """Per-frame random noise grain for horror atmosphere."""
+    rng = random.Random(frame_idx * 7919)
+    W, H  = img.size
+    grain = Image.new("L", (W, H))
+    px    = grain.load()
+    for y in range(0, H, 2):
+        for x in range(0, W, 2):
+            v = rng.randint(-strength, strength)
+            for dy in range(2):
+                for dx in range(2):
+                    if x + dx < W and y + dy < H:
+                        px[x + dx, y + dy] = max(0, min(255, 128 + v))
+    grain_rgb = Image.merge("RGB", (grain, grain, grain))
+    return Image.blend(img, grain_rgb, alpha=0.07)
+
+
+def _apply_red_flicker(img: Image.Image, frame_idx: int) -> Image.Image:
+    """Occasional red tint flash on NARRATOR frames for dread effect."""
+    rng = random.Random(frame_idx * 1337)
+    if rng.random() > 0.18:
+        return img
+    W, H    = img.size
+    flicker = Image.new("RGBA", (W, H), (120, 0, 0, rng.randint(12, 35)))
+    return Image.alpha_composite(img.convert("RGBA"), flicker).convert("RGB")
+
+
+def _apply_horror_effects(img: Image.Image, frame_idx: int, is_narrator: bool = False) -> Image.Image:
+    """Apply all horror visual effects to a frame."""
+    img = _apply_vignette(img, intensity=0.70 if is_narrator else 0.55)
+    img = _apply_scanlines(img, alpha=20)
+    img = _apply_film_grain(img, frame_idx, strength=12)
+    if is_narrator:
+        img = _apply_red_flicker(img, frame_idx)
+    return img
+
+
+def _draw_horror_header(draw, W: int, font) -> None:
+    draw.rectangle([0, 0, W, 82], fill=(10, 2, 2))
+    draw.rectangle([0, 82, W, 87], fill=(140, 10, 10))  # blood-red accent line
+    left_text  = "KWENTONG MULTO  \u2022  Mga Tunay na Karanasan ng mga Pilipino"
+    right_text = "I-comment sa ibaba  \u2193"
+    draw.text((28, 18), left_text, fill=(190, 140, 140), font=font)
+    try:
+        rtw = int(font.getlength(right_text))
+    except Exception:
+        rtw = len(right_text) * 18
+    draw.text((W - rtw - 28, 18), right_text, fill=(150, 90, 90), font=font)
 
 
 def _make_card_frame(seg: dict, W: int = 1920, H: int = 1080) -> Image.Image:
-    """Reddit dark-mode post card for NARRATOR / OP segments."""
-    img  = Image.new("RGB", (W, H), (8, 3, 3))
+    """Filipino horror story card for NARRATOR / OP / OP_MALE segments."""
+    img  = Image.new("RGB", (W, H), (5, 0, 5))
     draw = ImageDraw.Draw(img)
 
     f_hdr  = _vchat_font("arialbd.ttf", 35)
@@ -416,57 +488,66 @@ def _make_card_frame(seg: dict, W: int = 1920, H: int = 1080) -> Image.Image:
     f_body = _vchat_font("arial.ttf",   34)
     f_foot = _vchat_font("arial.ttf",   24)
 
-    _draw_reddit_header(draw, W, f_hdr)
+    _draw_horror_header(draw, W, f_hdr)
 
-    # Card dimensions
+    # Subtle corner vignette — dark red bleed at corners
+    for i in range(40):
+        alpha = int(60 * (1 - i / 40))
+        draw.rectangle([0, 87 + i, W, 87 + i + 1], fill=(20 - i // 4, 0, 0))
+
+    # Card
     CX, CY = 130, 105
     CW, CH = W - 260, H - 125
-    draw.rectangle([CX, CY, CX + CW, CY + CH], fill=(28, 24, 28))
-    draw.rectangle([CX, CY, CX + CW, CY + CH], outline=(55, 50, 55), width=2)
-    draw.rectangle([CX, CY, CX + 5, CY + CH], fill=(255, 69, 0))  # Reddit orange left bar
+    draw.rectangle([CX, CY, CX + CW, CY + CH], fill=(18, 5, 5))
+    draw.rectangle([CX, CY, CX + CW, CY + CH], outline=(100, 20, 20), width=2)
+    draw.rectangle([CX, CY, CX + 5, CY + CH], fill=(160, 10, 10))  # blood-red left bar
 
     tx = CX + 26
     y  = CY + 18
 
-    # Subreddit + meta line
-    draw.text((tx, y), "r/AmItheAsshole", fill=(255, 95, 35), font=f_sub)
+    # Speaker label + metadata
+    spk   = seg.get("speaker", "NARRATOR")
+    label = _LABEL_MAP.get(spk, spk.title())
+    color = _speaker_color(spk)
+    draw.text((tx, y), label.upper(), fill=color, font=f_sub)
     y += 36
-    spk  = seg.get("speaker", "NARRATOR")
-    meta = ("u/throwaway_aita_user  \u2022  14 hours ago  \u2022  Top Post r/AITA"
-            if spk in ("OP", "OP_MALE") else "Narrator")
-    draw.text((tx, y), meta, fill=(128, 120, 128), font=f_meta)
+    if spk in ("OP", "OP_MALE"):
+        meta = "Sariling Karanasan  \u2022  Kwentong Multo Philippines"
+    else:
+        meta = "Tagapagsalaysay  \u2022  Kwentong Multo"
+    draw.text((tx, y), meta, fill=(100, 60, 60), font=f_meta)
     y += 32
-    draw.rectangle([CX + 18, y, CX + CW - 18, y + 1], fill=(55, 50, 55))
+    draw.rectangle([CX + 18, y, CX + CW - 18, y + 1], fill=(55, 20, 20))
     y += 14
 
     # Body text
-    WRAP     = 74
-    LINE_H   = 44
+    WRAP      = 74
+    LINE_H    = 44
     max_lines = (CH - (y - CY) - 58) // LINE_H
-    lines    = textwrap.wrap(seg.get("text", ""), width=WRAP)
+    lines     = textwrap.wrap(seg.get("text", ""), width=WRAP)
     for line in lines[:max_lines]:
-        draw.text((tx, y), line, fill=(205, 198, 205), font=f_body)
+        draw.text((tx, y), line, fill=(210, 195, 195), font=f_body)
         y += LINE_H
     if len(lines) > max_lines:
-        draw.text((tx, y), "\u2026", fill=(130, 122, 130), font=f_body)
+        draw.text((tx, y), "\u2026", fill=(100, 70, 70), font=f_body)
 
-    # Footer (mock engagement stats)
+    # Footer
     fy = CY + CH - 42
-    draw.rectangle([CX + 18, fy - 6, CX + CW - 18, fy - 5], fill=(50, 46, 50))
-    draw.text((tx, fy), "\u25b2  24.7k    \u25cf  3.2k Comments    Share    Save",
-              fill=(120, 115, 120), font=f_foot)
+    draw.rectangle([CX + 18, fy - 6, CX + CW - 18, fy - 5], fill=(50, 15, 15))
+    draw.text((tx, fy), "[SINDAK]  24.7k    [MULTO]  3.2k Naniniwala    Mag-Subscribe",
+              fill=(110, 70, 70), font=f_foot)
     return img
 
 
 def _make_bubble_frame(history: list, W: int = 1920, H: int = 1080) -> Image.Image:
-    """Chat-bubble frame for dialogue speakers."""
-    img  = Image.new("RGB", (W, H), (10, 3, 3))
+    """Horror chat-bubble frame for dialogue speakers."""
+    img  = Image.new("RGB", (W, H), (5, 0, 5))
     draw = ImageDraw.Draw(img)
 
     f_hdr  = _vchat_font("arialbd.ttf", 35)
     f_lbl  = _vchat_font("arialbd.ttf", 27)
     f_text = _vchat_font("arial.ttf",   40)
-    _draw_reddit_header(draw, W, f_hdr)
+    _draw_horror_header(draw, W, f_hdr)
 
     BX, BW  = 75, W - 150
     PAD     = 20
@@ -522,6 +603,47 @@ def _make_bubble_frame(history: list, W: int = 1920, H: int = 1080) -> Image.Ima
     return img
 
 
+# ── Horror ambient audio generator ───────────────────────────────────────────
+
+def _generate_horror_ambient(output_path: str, duration: float, ffmpeg: str) -> str | None:
+    """
+    Synthesize a low-frequency horror ambient drone using ffmpeg:
+    - 38 Hz + 57 Hz + 76 Hz sine tones (ominous rumble)
+    - Heavy echo/reverb for cavern-like dread
+    - Low-pass filtered to keep only bass atmosphere
+    """
+    try:
+        d = f"{duration + 2:.2f}"
+        cmd = [
+            ffmpeg, "-y",
+            "-f", "lavfi", "-i", f"sine=frequency=38:duration={d}",
+            "-f", "lavfi", "-i", f"sine=frequency=57:duration={d}",
+            "-f", "lavfi", "-i", f"sine=frequency=76:duration={d}",
+            "-f", "lavfi", "-i", f"sine=frequency=19:duration={d}",
+            "-filter_complex", (
+                "[0:a]volume=0.35[a0];"
+                "[1:a]volume=0.22[a1];"
+                "[2:a]volume=0.14[a2];"
+                "[3:a]volume=0.10[a3];"
+                "[a0][a1][a2][a3]amix=inputs=4,"
+                "aecho=0.88:0.60:900:0.40,"
+                "aecho=0.70:0.45:1800:0.25,"
+                "lowpass=f=220,"
+                "volume=3.0"
+            ),
+            "-c:a", "aac", "-b:a", "128k",
+            output_path,
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        if result.returncode == 0 and os.path.exists(output_path):
+            print("[render] Horror ambient drone generated")
+            return output_path
+        print(f"[render] Horror ambient failed (non-fatal): {result.stderr[-200:]}")
+    except Exception as e:
+        print(f"[render] Horror ambient exception (non-fatal): {e}")
+    return None
+
+
 def render_chat_video(
     audio_path: str,
     segments: list,
@@ -529,8 +651,8 @@ def render_chat_video(
     music_path: str | None = None,
 ) -> str:
     """
-    Render Reddit-style video: post cards for narration, chat bubbles for dialogue.
-    No Pexels B-roll downloads needed. Looks like top AITA channels.
+    Render Filipino horror video: dark story cards for narration, horror chat bubbles for dialogue.
+    Includes synthesized horror ambient audio underneath TTS speech.
     """
     ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
     base   = os.path.dirname(output_path) or "."
@@ -555,6 +677,9 @@ def render_chat_video(
         frame = (_make_card_frame(seg)
                  if spk in _MONOLOGUE_SPEAKERS
                  else _make_bubble_frame(history))
+
+        # Apply horror visual effects
+        frame = _apply_horror_effects(frame, i, is_narrator=(spk in _MONOLOGUE_SPEAKERS))
 
         fpath = os.path.join(fd, f"frame_{i:04d}.png")
         frame.save(fpath, "PNG")
@@ -585,29 +710,57 @@ def render_chat_video(
     if result.returncode != 0:
         raise RuntimeError(f"Frame encode failed:\n{result.stderr[-800:]}")
 
-    # Mux audio + optional music
-    has_music    = music_path and os.path.exists(music_path)
-    fade_out     = max(0, audio_duration - 4)
+    # Use local horror music (always — it IS the ambient track)
+    if not music_path:
+        local_music = os.path.join(os.path.dirname(__file__), "music", "horror_ambient_loop.mp3")
+        if os.path.exists(local_music):
+            music_path = local_music
+
+    # Mux audio + horror ambient music
+    has_music   = music_path and os.path.exists(music_path)
+    has_ambient = False   # sine drone removed; horror_ambient_loop.mp3 is the ambient
+    fade_out    = max(0, audio_duration - 4)
     print("[render] Assembling final video...")
 
+    inputs = [ffmpeg, "-y", "-i", silent, "-i", audio_path]
     if has_music:
-        afilt = (
-            "[1:a]volume=1.0[speech];"
-            f"[2:a]volume=0.13,afade=t=in:st=0:d=3,"
-            f"afade=t=out:st={fade_out:.1f}:d=4[music];"
-            "[speech][music]amix=inputs=2:dropout_transition=3[aout]"
+        inputs += ["-i", music_path]
+
+    # Build audio filter graph
+    n_audio = 1 + (1 if has_ambient else 0) + (1 if has_music else 0)
+    if n_audio == 1:
+        afilt = None
+        amap  = "1:a"
+    else:
+        parts  = ["[1:a]volume=1.0[speech]"]
+        mixins = ["[speech]"]
+        idx    = 2
+        if has_music:
+            parts.append(
+                f"[{idx}:a]volume=0.72,"
+                f"afade=t=in:st=0:d=3,afade=t=out:st={fade_out:.1f}:d=4[music]"
+            )
+            mixins.append("[music]")
+        n_mix = len(mixins)
+        parts.append(
+            f"{''.join(mixins)}amix=inputs={n_mix}:normalize=0:dropout_transition=3[aout]"
         )
+        afilt = ";".join(parts)
+        amap  = "[aout]"
+
+    if afilt:
         cmd = [
-            ffmpeg, "-y", "-i", silent, "-i", audio_path, "-i", music_path,
-            "-filter_complex", afilt, "-map", "0:v", "-map", "[aout]",
+            *inputs,
+            "-filter_complex", afilt,
+            "-map", "0:v", "-map", amap,
             *_encode_args(), "-pix_fmt", "yuv420p",
             "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart",
             "-t", str(audio_duration), output_path,
         ]
     else:
         cmd = [
-            ffmpeg, "-y", "-i", silent, "-i", audio_path,
-            "-map", "0:v", "-map", "1:a",
+            *inputs,
+            "-map", "0:v", "-map", amap,
             *_encode_args(), "-pix_fmt", "yuv420p",
             "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart",
             "-t", str(audio_duration), output_path,
@@ -621,6 +774,8 @@ def render_chat_video(
     os.remove(list_file)
     if os.path.exists(silent):
         os.remove(silent)
+    if has_ambient and os.path.exists(ambient_path):
+        os.remove(ambient_path)
     shutil.rmtree(fd, ignore_errors=True)
 
     sz = os.path.getsize(output_path) / 1_000_000

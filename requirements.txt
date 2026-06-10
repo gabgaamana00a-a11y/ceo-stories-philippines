@@ -3,9 +3,8 @@ python-dotenv
 requests
 moviepy
 
-# TTS — Kokoro-82M (open-weight, emotional voices, GPU/CPU)
-kokoro-onnx
-soundfile
+# TTS — Microsoft Edge TTS (free Filipino neural voices, no API key needed)
+edge-tts
 
 # Video processing
 imageio
@@ -23,6 +22,3 @@ google-auth-httplib2
 # Local scheduler (optional, for running without GitHub Actions)
 apscheduler
 flask
-
-# Trending
-pytrends

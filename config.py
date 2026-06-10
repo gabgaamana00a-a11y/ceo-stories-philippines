@@ -1,24 +1,25 @@
-"""Central config for Drama Desk — AITA/Reddit drama YouTube channel."""
+"""Central config for Kwentong Multo — Filipino horror & supernatural YouTube channel."""
 
-CHANNEL_NAME = "Drama Desk"
-CHANNEL_NICHE = "aita_drama"
+CHANNEL_NAME = "Kwentong Multo"
+CHANNEL_NICHE = "tagalog_horror"
 
 # ── YouTube upload ────────────────────────────────────────────────────────────
 UPLOAD_PRIVACY  = "public"   # public | unlisted | private
-UPLOAD_CATEGORY = "22"       # 22 = People & Blogs (best for AITA narrator format)
+UPLOAD_CATEGORY = "22"       # 22 = People & Blogs
 UPLOAD_TAGS = [
-    # Exact-match high-volume searches
-    "aita", "am i the asshole", "am i wrong", "reddit aita", "aita reddit",
-    "reddit stories", "reddit drama", "reddit story time", "best reddit stories",
-    # Long-tail relationship terms
-    "relationship advice", "relationship drama", "family drama",
-    "mother in law drama", "cheating story", "toxic relationship story",
-    # Format/channel terms
-    "storytime", "true story", "drama channel", "drama desk",
-    "reddit reading", "reddit narration", "aita stories 2025",
-    # Discovery terms
-    "entitled people", "viral reddit", "shocking story",
-    "reddit update", "unbelievable story", "real story",
+    # High-volume Tagalog horror searches
+    "kwentong multo", "multo", "horror story tagalog", "kwentong horror",
+    "tagalog horror stories", "kwentong aswang", "aswang story",
+    "kwentong totoo", "true horror story philippines", "pinoy horror",
+    # Folklore creatures
+    "aswang", "manananggal", "kapre", "tikbalang", "duwende", "sigbin",
+    "engkanto", "white lady", "multo sa paaralan", "multo sa ospital",
+    # Format/discovery terms
+    "horror stories", "kwentong sindak", "nakakatakot na kwento",
+    "pinoy scary stories", "philippine folklore", "urban legend philippines",
+    "ofw horror story", "probinsya horror", "kwentong multo 2025",
+    # Engagement terms
+    "nakakatakot", "totoo ba ito", "true story", "pinoy horror channel",
 ]
 
 # ── Video format — 16:9 landscape for YouTube long-form ──────────────────────
@@ -26,69 +27,75 @@ VIDEO_WIDTH  = 1920
 VIDEO_HEIGHT = 1080
 VIDEO_FPS    = 30
 
-# Target script length for a 5-10 minute video
-SCRIPT_MIN_WORDS = 700
-SCRIPT_MAX_WORDS = 1200
+# Target script length for a 8-12 minute video
+SCRIPT_MIN_WORDS = 900
+SCRIPT_MAX_WORDS = 1400
 
-# ── TTS voices (Kokoro-82M — open-weight, emotional, runs on CPU/GPU) ────────
-# Grade A/A- voices chosen for maximum expressiveness.
-# Local: GPU-accelerated via PyTorch. GitHub Actions: CPU via ONNX.
+# ── TTS voices (Microsoft Edge TTS — free, Filipino language support) ─────────
+# Uses edge-tts package. Only 2 Filipino neural voices available.
 VOICES = {
-    "NARRATOR":     "af_heart",    # Grade A — warmest, most emotional female narrator
-    "OP":           "af_bella",    # Grade A- — passionate, great for personal monologues
-    "OP_MALE":      "am_michael",  # Grade B — authoritative male storyteller
-    "CHARACTER_F":  "af_nicole",   # Grade B- — distinctive, opinionated
-    "CHARACTER_M":  "am_fenrir",   # Grade B — dramatic deep male
-    "CHARACTER_F2": "af_aoede",    # Grade B — warm secondary female
-    "CHARACTER_M2": "am_puck",     # Grade B — lighter younger male
-    # Aliases used by LLM-generated scripts
-    "HER":          "af_nicole",
-    "HIM":          "am_fenrir",
-    "HER_FRIEND":   "af_aoede",
-    "HIS_FRIEND":   "am_puck",
+    "NARRATOR":     "fil-PH-AngeloNeural",      # deep male narrator — ominous horror voice
+    "OP":           "fil-PH-BlessicaNeural",   # female first-person storyteller
+    "OP_MALE":      "fil-PH-AngeloNeural",      # male first-person storyteller
+    "CHARACTER_F":  "fil-PH-BlessicaNeural",    # female character
+    "CHARACTER_M":  "fil-PH-AngeloNeural",      # male character
+    "CHARACTER_F2": "fil-PH-BlessicaNeural",    # secondary female
+    "CHARACTER_M2": "fil-PH-AngeloNeural",      # secondary male
+    # Aliases
+    "SIYA_B":       "fil-PH-BlessicaNeural",
+    "SIYA_L":       "fil-PH-AngeloNeural",
+    "KAIBIGAN":     "fil-PH-AngeloNeural",
+    "INA":          "fil-PH-BlessicaNeural",
+    "AMA":          "fil-PH-AngeloNeural",
 }
 
 # Human-readable display names shown as on-screen speaker labels
 SPEAKER_LABELS = {
-    "NARRATOR":     "NARRATOR",
-    "OP":           "OP",
-    "OP_MALE":      "OP",
-    "CHARACTER_F":  "HER",
-    "CHARACTER_M":  "HIM",
-    "CHARACTER_F2": "HER FRIEND",
-    "CHARACTER_M2": "HIS FRIEND",
+    "NARRATOR":     "TAGAPAGSALAYSAY",
+    "OP":           "KWENTISTA",
+    "OP_MALE":      "KWENTISTA",
+    "CHARACTER_F":  "SIYA",
+    "CHARACTER_M":  "SIYA",
+    "CHARACTER_F2": "KAIBIGAN",
+    "CHARACTER_M2": "KAIBIGAN",
+    "SIYA_B":       "SIYA",
+    "SIYA_L":       "SIYA",
+    "KAIBIGAN":     "KAIBIGAN",
+    "INA":          "INA",
+    "AMA":          "AMA",
 }
 
-# ── Pexels B-roll scene mapping ───────────────────────────────────────────────
-# Maps detected scene keywords in script → Pexels search queries
+# ── Pexels B-roll scene mapping (horror-themed) ───────────────────────────────
 SCENE_KEYWORDS = {
-    "restaurant":   ["restaurant dining", "cafe people"],
-    "kitchen":      ["kitchen cooking", "home kitchen"],
-    "bedroom":      ["bedroom interior", "home room"],
-    "office":       ["office workplace", "business meeting"],
-    "wedding":      ["wedding ceremony", "bride"],
-    "phone":        ["smartphone texting", "phone call"],
-    "family":       ["family dinner", "family gathering"],
-    "outdoor":      ["city street people", "park outdoor"],
-    "argument":     ["couple conflict", "people arguing"],
-    "couple":       ["couple relationship", "man woman"],
-    "money":        ["money finance", "cash bills"],
-    "default":      ["cinematic people", "dramatic indoor", "living room"],
+    "gabi":         ["dark night forest", "scary night"],
+    "bundok":       ["dark mountain forest", "foggy forest"],
+    "probinsya":    ["rural philippines", "tropical forest night"],
+    "bahay":        ["dark house interior", "abandoned house"],
+    "ospital":      ["hospital corridor dark", "hospital night"],
+    "paaralan":     ["empty school corridor", "dark school"],
+    "gubat":        ["dark jungle forest", "foggy forest path"],
+    "ilog":         ["river night", "dark water"],
+    "baryo":        ["rural village night", "tropical village dark"],
+    "abroad":       ["city night street", "dark apartment"],
+    "kwarto":       ["dark bedroom", "dim room interior"],
+    "kitchen":      ["dark kitchen", "dim kitchen interior"],
+    "default":      ["dark forest night", "foggy path", "abandoned building"],
 }
 
-# ── Reddit drama subreddits (for trending story seeds) ───────────────────────
-DRAMA_SUBREDDITS = [
-    "AmItheAsshole",
-    "AITAH",
-    "relationship_advice",
-    "entitledparents",
-    "tifu",
-    "TrueOffMyChest",
-    "offmychest",
-    "weddingshaming",
-    "JUSTNOMIL",
+# ── Horror story categories for sustainable 365-day rotation ──────────────────
+HORROR_CATEGORIES = [
+    "aswang_folklore",      # aswang, manananggal, berberoka, sigbin
+    "engkanto_spirits",     # engkanto, diwata, kapre, tikbalang, duwende
+    "multo_ghost",          # white lady, school ghosts, house haunting
+    "ofw_horror",           # overseas Filipino worker supernatural encounters
+    "paaralan_horror",      # school/university ghost stories
+    "ospital_horror",       # hospital ghost stories
+    "probinsya_horror",     # province rural supernatural stories
+    "urban_legend",         # Metro Manila / Cebu city urban legends
+    "pamilya_horror",       # family supernatural/curse stories
+    "panaginip_paranormal", # dreams, premonitions, paranormal
 ]
 
-# ── Schedule ──────────────────────────────────────────────────────────────────
-SCHEDULE_HOUR   = 14   # 2 PM UTC = 9 AM EST / 10 AM EDT
+# ── Schedule (Philippine Standard Time UTC+8 = prime time 8-9 PM PST) ────────
+SCHEDULE_HOUR   = 12   # 12 PM UTC = 8 PM PST
 SCHEDULE_MINUTE = 0
