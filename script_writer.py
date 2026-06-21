@@ -1,7 +1,7 @@
 """
-script_writer.py — Generate original multi-voice Tagalog horror scripts via OpenRouter.
+script_writer.py — Generate original multi-voice Tagalog CEO success scripts via OpenRouter.
 
-Niche: Filipino horror & supernatural stories (Filipino audience, 18-45)
+Niche: Filipino CEO & success stories (Filipino audience, 18-45)
 Format: Radio-drama style with [SPEAKER] tags, 900-1400 words (~8-12 min read)
 Language: Tagalog (Filipino) with natural spoken expressions
 Model: Gemini / Claude via OpenRouter
@@ -16,12 +16,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ── System prompt ─────────────────────────────────────────────────────────────
-_SYSTEM_PROMPT = """Ikaw ay isang viral na manunulat ng script para sa "Kwentong Multo," isang YouTube channel na nagkukuwento ng mga kakaibang karanasan ng mga Pilipino — multo, aswang, engkanto, at iba pang hindi maipaliwanag na bagay. Ang iyong mga script ay dapat mapanatili ang mga manonood na nanonood hanggang sa katapusan ng video.
+_SYSTEM_PROMPT = """Ikaw ay isang viral na manunulat ng script para sa "CEO Stories Philippines," isang YouTube channel na nagkukuwento ng mga tunay na kwento ng tagumpay ng mga Pilipino — mula sa wala hanggang sa yumaman, mula sa hirap hanggang sa pagiging CEO. Ang iyong mga script ay dapat mapanatili ang mga manonood na nanonood hanggang sa katapusan ng video.
 
-TARGET AUDIENCE: Mga Filipino adults 18-45 sa Pilipinas at sa buong mundo (OFW, diaspora). Palaging nag-iiscroll. Walo lang ang segundo mo para mahuli ang kanilang atensyon.
+TARGET AUDIENCE: Mga Filipino adults 18-45 sa Pilipinas at sa buong mundo (OFW, diaspora). Mga nangangarap, naghahanap ng inspirasyon, at gustong matuto sa tagumpay ng iba.
 
 SPEAKER TAGS — gamitin LAMANG ang mga ito, eksaktong nakasulat:
-  [NARRATOR]     — Ang tagapagsalaysay. Mainit, nakakakilig, parang kaibigan na nagkukwento.
+  [NARRATOR]     — Ang tagapagsalaysay. Mainit, nakaka-inspire, parang kaibigan na nagkukwento.
   [OP]           — Ang nagkukwento (babae). Gamitin para sa BAWAT linya ng OP, kasama ang mga diyalogo.
   [OP_MALE]      — Ang nagkukwento (lalaki). Gamitin para sa BAWAT linya ng OP, kasama ang mga diyalogo.
   [CHARACTER_F]  — Pangunahing babaeng karakter (gamitin ang kanyang totoong pangalan sa teksto)
@@ -33,52 +33,53 @@ BAWAL — HUWAG KAILANMAN gamitin ang mga ito: [SIYA] [SILA] [KAIBIGAN] [INA] [A
 Ang bawat tao ay DAPAT may sariling natatanging tag mula sa listahan sa itaas.
 
 TAMANG halimbawa ng dialogue exchange:
-[OP] Lumingon ako sa kanya at sinabi ko — totoo ba ito?
-[CHARACTER_F] Totoo. Hindi ako nagbibiro sa iyo.
-[OP] Pero paano? Sinabi mo na...
-[CHARACTER_F] Alam ko ang sinabi ko. Ngunit nakita ko ito ng sarili kong mata.
+[OP] Lumingon ako sa kanya at sinabi ko — naniniwala ka ba sa akin?
+[CHARACTER_F] Naniniwala ako. At tutulungan kitang maabot ang pangarap mo.
+[OP] Pero paano? Wala akong pera...
+[CHARACTER_F] Hindi pera ang kailangan mo. Kung ano ang nasa puso mo — iyon ang mahalaga.
 
 MALI (huwag gawin ito):
 [SIYA] Sinabi niya iyon.
-[ATE] Sumagot ang ate ko.
+[KAIBIGAN] Sumagot ang kaibigan ko.
 
-═══ VIRAL HORROR HOOK FORMULA (HINDI MAAARING BAGUHIN) ═══
+═══ VIRAL CEO SUCCESS HOOK FORMULA (HINDI MAAARING BAGUHIN) ═══
 
 STRUCTURE — sundin ito EKSAKTONG:
 
-HAKBANG 1 — [NARRATOR] COLD OPEN (unang 10 segundo, pinaka-nakakatakot na sandali muna):
-  Simulan sa PINAKA-NAKAGUGULAT o nakakatakot na sandali ng kwento bilang teaser.
-  Halimbawa: "Nandoon pa rin siya. Sa sulok. Tumingin sa akin. Kahit tatlong taon na siyang patay."
-  Pagkatapos sabihin: "Hayaan ninyo akong ikuwento kung paano nagsimula ang lahat."
+HAKBANG 1 — [NARRATOR] COLD OPEN (unang 10 segundo, pinaka-dramatikong sandali muna):
+  Simulan sa PINAKA-DRAMATIKO o nakakagulat na sandali ng kwento bilang teaser.
+  Halimbawa: "Isang gabi, natutulog siya sa bangketa. Makalipas ang limang taon, pagmamay-ari na niya ang buong kalsada."
+  Pagkatapos sabihin: "Hayaan ninyong ikuwento ko kung paano nagsimula ang lahat."
   ITO ANG PINAKA-MAHALAGANG BAHAGI. Imposibleng mag-click away.
 
 HAKBANG 2 — [OP] Setup (first-person, 2-3 talata, may mga tiyak na detalye):
-  Totoong pangalan ng lugar sa Pilipinas, tiyak na edad, tiyak na setting, tunay na emosyonal na stakes.
-  Tapusin sa: isang linyang nagpapahiwatig na may MALAPIT NANG MANGYARING masama.
+  Totoong pangalan ng lugar sa Pilipinas, tiyak na edad, tiyak na setting ng kahirapan.
+  Ilarawan ang sitwasyon ng bida — walang pera, walang trabaho, walang pag-asa.
+  Tapusin sa: isang linyang nagpapahiwatig na may MALAPIT NANG MAGBAGO.
 
 HAKBANG 3 — [NARRATOR] Bridge:
-  "At dito nagsimulang maging kakaiba ang lahat..."
-  I-set up ang conflict. Bumuo ng suspense. Magdagdag ng mid-story CTA:
-  "Mag-comment ng 😱 kung naniniwala kayo sa mga ganitong kwento — dahil lalala pa ito."
+  "At dito nagsimulang magbago ang lahat..."
+  I-set up ang turning point. Magdagdag ng mid-story CTA:
+  "Mag-comment ng 💪 kung na-inspire ka sa kwentong ito — dahil mas gaganda pa ito."
 
 HAKBANG 4 — Dialogue exchange (hindi bababa sa 5 linya ng pabalik-balik):
-  Raw, makatotohanan, puno ng takot o pangamba. Totoong pangalan. Hindi pormal na salita.
+  Emosyonal, makatotohanan, puno ng determinasyon o pagsubok. Totoong pangalan.
 
 HAKBANG 5 — [NARRATOR] Stakes raiser (mid-video retention hook):
   Mag-react tulad ng nagulat na kaibigan. Pagkatapos magdagdag ng:
-  "At magtiwala kayo — kailangan ninyong manatili para sa susunod na mangyayari. Dahil dito talagang nagiging hindi kapani-paniwala."
+  "At magtiwala kayo — kailangan ninyong manatili para sa susunod na mangyayari. Dahil dito talagang nagiging hindi kapani-paniwala ang kanyang tagumpay."
 
-HAKBANG 6 — [OP/OP_MALE] Confrontation o Reveal:
-  Ang sandali ng pinaka-matinding takot. Ang bagay na itinanong ng cold open.
+HAKBANG 6 — [OP/OP_MALE] The Breakthrough:
+  Ang sandali ng tagumpay. Ang malaking pagbabago. Unang malaking kita, unang kontrata, unang award.
 
-HAKBANG 7 — Higit pang diyalogo — ang explosive climax exchange (hindi bababa sa 4 pang linya):
-  Dapat parang eksena mula sa pelikula. Raw, totoo, nakakakilig.
+HAKBANG 7 — Higit pang diyalogo — ang climax (hindi bababa sa 4 pang linya):
+  Dapat parang eksena mula sa pelikula. Inspirational, nakakaiyak, nakakapag-pa-microphone drop.
 
 HAKBANG 8 — [OP/OP_MALE] Aftermath:
-  Emosyonal na kahihinatnan. Ano ang ginawa nila pagkatapos. Ano pa rin ang nararamdaman nila.
+  Ano ang nangyari pagkatapos. Paano nagbago ang buhay. Sino ang tinulungan niya.
 
 HAKBANG 9 — [NARRATOR] Pagtatapos:
-  I-recap ang dalawang panig nang patas. Pagkatapos: "Kaya — totoo ba ito o kathang-isip lamang? I-comment ang inyong mga nararamdaman. At kung may sarili kayong karanasan tulad nito — ibahagi ninyo sa comments. Mag-subscribe para sa bagong kwento araw-araw."
+  I-recap ang kwento nang patas. Pagkatapos: "Kaya — anong aral ang natutunan mo sa kwentong ito? I-comment ang inyong mga saloobin. At kung may sarili kayong kwento ng tagumpay — ibahagi ninyo sa comments. Mag-subscribe para sa bagong kwento araw-araw."
 
 ═══ MGA PATAKARAN ═══
 - Sumulat ng 950-1400 salita sa kabuuan
@@ -93,21 +94,22 @@ HAKBANG 9 — [NARRATOR] Pagtatapos:
 
 # ── Niche-specific prompt boosts ──────────────────────────────────────────────
 _NICHE_CONTEXT = """
-MGA TIYAK NA HORROR NICHE NA AMING TINATAKPAN (i-rotate nang natural batay sa story seed):
-• Aswang at folklore — manananggal, tikbalang, kapre, sigbin, berberoka, dwende
-• Engkanto at espiritu — engkanto, diwata, nimpa, mga espiritu ng kalikasan
-• Multo at patay — white lady, multo sa bahay, multo na hindi alam na patay
-• OFW horror — karanasan ng mga Pilipino sa ibang bansa na hindi maipaliwanag
-• Paaralan — multo sa eskwelahan, kaklaseng hindi totoo, gusaling may naninirahan
-• Ospital — pasyenteng hindi naka-admit, nurse na nakakarinig ng hindi naririnig
-• Probinsya — baryo na may lihim, aswang na kapit-bahay, ritwal ng pamilya
-• Urban legend — Metro Manila, Cebu, at iba pang lungsod na may kwento
+MGA TIYAK NA CEO SUCCESS NICHE NA AMING TINATAKPAN (i-rotate nang natural batay sa story seed):
+• Rags to Riches — mula sa kahirapan hanggang sa yumaman
+• OFW Success — OFW na naging CEO o negosyante
+• Small Business — mula sa maliit na negosyo hanggang sa malaking korporasyon
+• Startup Story — tech startup na nagtagumpay
+• Family Business — pampamilyang negosyo na lumago
+• Failure to Success — bagsak, bumangon, nagtagumpay
+• CEO Revenge — pinahiya, niloko, tapos naging mas successful
+• Humble Beginning — simpleng simula, malaking tagumpay
 
 FILIPINO CULTURAL CONTEXT:
-- Itakda ang mga kwento sa mga kilalang lugar ng Pilipinas: probinsya ng Capiz, Balete Drive,
-  lumang ospital, bahay na minana, eskwelahang gothic, baryo sa Visayas, atbp.
+- Itakda ang mga kwento sa mga kilalang lugar ng Pilipinas: Tondo, probinsya, BGC, Makati, atbp.
 - Gamitin ang mga tunay na Filipino na pangalan at lugar para parang totoo
 - Ang mga manonood ay nagtatanda ng mga katulad nilang karanasan — gawin silang maramdaman ito
+- Ipakita ang hirap ng buhay sa Pilipinas: walang kuryente, naglalakad papuntang eskwela, nagtitinda sa kalsada
+- I-emphasize ang Filipino values: sipag, tiyaga, pamilya, faith, bayanihan
 """
 
 
@@ -150,22 +152,41 @@ def _normalize_speaker_tags(script: str) -> str:
     return _re.sub(r"\[([A-Z][A-Z0-9_ ]*)\]", _replace, script)
 
 
-def generate_drama_script(story_seed: str) -> str:
-    """Generate a full multi-voice Tagalog horror script from a story seed."""
+def generate_drama_script(story_seed: str, target_minutes: int = 10) -> str:
+    """Generate a Tagalog CEO success script.
+
+    Uses FREE procedural story engine by default (no API costs).
+    Falls back to OpenRouter only if seed indicates custom/premium content.
+    For long stories (30+ min), always uses the story engine.
+    """
+    # For long stories, always use the free story engine
+    if target_minutes >= 15:
+        print(f"[script] Using FREE story engine ({target_minutes} min target)...")
+        try:
+            from story_engine import generate_long_script
+            script = generate_long_script(story_seed, target_minutes)
+            if script:
+                return _normalize_speaker_tags(script)
+        except Exception as e:
+            print(f"[script] Story engine failed: {e}")
+
+    # Try OpenRouter for short stories if keys available
     from config import get_openrouter_keys
     api_keys = get_openrouter_keys()
     if not api_keys:
-        print("[script] No OPENROUTER_API_KEY — using fallback script")
-        return _fallback_script(story_seed)
+        print("[script] No OPENROUTER_API_KEY — using procedural engine")
+        from story_engine import generate_long_script
+        return _normalize_speaker_tags(generate_long_script(story_seed, target_minutes))
 
-    user_prompt = f"""Sumulat ng buong horror script para sa sumusunod na premisa ng kwento:
+    user_prompt = f"""Sumulat ng buong inspirational CEO success story script para sa sumusunod na premisa ng kwento:
 
 "{story_seed}"
 
 {_NICHE_CONTEXT}
 
-Gawin itong parang totoo, nakakatakot, at puno ng suspense. Bumuo ng takot nang unti-unti.
-Ang manonood ay dapat maramdaman na maaari rin silang mapunta sa sitwasyong ito.
+Gawin itong parang totoo, nakaka-inspire, at puno ng emosyon. Bumuo ng inspirasyon nang unti-unti.
+Ang manonood ay dapat maramdaman na maaari rin silang magtagumpay sa kabila ng hirap.
+Gawing dramatiko ang pag-angat mula sa kahirapan tungo sa tagumpay.
 Tapusin sa tagapagsalaysay na nag-iimbitang mag-comment ang mga manonood."""
 
     models_to_try = [
@@ -244,83 +265,73 @@ Tapusin sa tagapagsalaysay na nag-iimbitang mag-comment ang mga manonood."""
 
 
 def _fallback_script(story_seed: str) -> str:
-    """Hard-coded Tagalog horror fallback so the pipeline never fully breaks."""
+    """Hard-coded Tagalog CEO success fallback so the pipeline never fully breaks."""
     names = random.choice([
-        ("Ana", "Marco", "Lola Nena"),
-        ("Maria", "Jose", "Lola Caring"),
-        ("Rosa", "Juan", "Nanay Celia"),
-        ("Clara", "Ramon", "Lola Puring"),
+        ("Maria", "Juan", "Aling Rosa"),
+        ("Ana", "Jose", "Nanay Elena"),
+        ("Clara", "Ramon", "Tatay Mario"),
+        ("Rosa", "Pedro", "Lola Puring"),
     ])
     op_name, char_m, char_f = names
 
-    return f"""[NARRATOR] Nandoon pa rin siya. Sa sulok ng kwarto. Nakatingin sa akin. \
-Kahit tatlong taon na siyang patay. Hayaan ninyo akong ikuwento kung paano nagsimula ang lahat.
+    return f"""[NARRATOR] Nakatira siya sa isang maliit na bahay kubo sa probinsya. \
+Walang kuryente. Walang tubig. Ngunit ngayon — pagmamay-ari niya ang isa sa pinakamalaking \
+kumpanya sa bansa. Hayaan ninyong ikuwento ko kung paano nagsimula ang lahat.
 
-[OP] Hindi ako naniniwala sa mga multo noon. Bata pa lang ako, lagi akong sinasabihan ng \
-aking {char_f} tungkol sa mga hindi maipaliwanag na bagay sa aming luma naming bahay sa probinsya. \
-Ngunit tulad ng karamihan sa amin, naisip ko na katha-isip lamang iyon ng matatanda. \
-Hanggang sa isang gabi, tatlong taon na ang nakakaraan, natuklasan ko ang totoo. \
-{story_seed}.
+[OP] Hindi madali ang aming buhay noon. Lumaki ako sa isang baryo sa Batangas, \
+kung saan ang tanging ilaw namin ay gasera at ang tanging pagkain namin ay kanin at asin. \
+Apat kaming magkakapatid, at ang aking {char_f} ay labandera, \
+habang ang aking {char_m} ay tricycle driver. {story_seed}.
 
-[NARRATOR] Para maunawaan ninyo kung bakit ito nakakatakot, kailangan ko munang \
-ibahagi sa inyo ang kasaysayan ng lugar na iyon. Dahil hindi ito nagsimula sa akin. \
-Nagsimula ito matagal na bago ako ipinanganak.
+[NARRATOR] Para maintindihan ninyo kung gaano kahirap ang kanyang pinanggalingan, \
+kailangan kong ikuwento ang kanyang pagkabata. Isang pagkabata na puno ng sakripisyo \
+at pangarap na makaahon sa kahirapan.
 
-[OP] Ang bahay ng aming pamilya sa Batangas ay itinayo ng aking lolo noong dekada sitenta. \
-Mabuting lugar ito noon — malawak na lupa, malapit sa ilog, maraming puno. \
-Ngunit may isang bahagi ng lote na palagi naming iniiwasan. Isang sulok sa likod ng bahay \
-na kahit ang mga hayop ay hindi lumalapitan. Sinabi ng aking {char_f} na may nakabaon doon. \
-Hindi niya sinabi kung ano.
+[OP] Tuwing umaga, gigising ako ng alas kwatro para tumulong sa aking ina. \
+Mag-iigib ng tubig, magsisibak ng kahoy, at magluluto bago pumasok sa eskwela. \
+Tatlong kilometro ang nilalakad ko araw-araw para makarating sa eskwelahan — \
+at ang sapatos ko ay butas-butas. Pero hindi ako sumuko. Alam ko na ang edukasyon \
+ang tanging paraan para makaahon kami sa kahirapan.
 
-[CHARACTER_F] {op_name}, huwag kang pupunta sa likod ng bahay. Lalo na kung gabi na. \
-Alam mo na ang sabi ko dito.
+[CHARACTER_F] {op_name}, anak, alam ko na mahirap para sa iyo. Pero huwag kang susuko. \
+Isang araw, maaabot mo rin ang iyong mga pangarap.
 
-[OP] Lagi ko itong sinusunod noong bata ako. Ngunit nang bumalik ako para alagaan \
-ang bahay pagkatapos mamatay ang aking {char_f}, ay nakalimutan ko na ang babalang iyon.
+[OP] Ang mga salitang iyon ng aking ina — iyon ang naging sandata ko sa bawat pagsubok.
 
-[NARRATOR] At dito nagsimulang maging kakaiba ang lahat. Mag-comment ng 😱 \
-kung nararamdaman na ninyo ang pagtaas ng balahibo sa inyong mga braso — \
-dahil lalala pa ito.
+[NARRATOR] At dito nagsimulang magbago ang lahat. Mag-comment ng 💪 \
+kung na-inspire ka na sa kwentong ito — dahil mas gaganda pa ito.
 
-[CHARACTER_M] {op_name}, may tinanong lang ako sa iyo. Gaano katagal ka na naririto?
+[CHARACTER_M] {op_name}, may alok ako sa iyo. Hindi ito malaki, pero simula ito. \
+Isang trabaho sa maliit kong tindahan. Walang malaking sweldo, pero matututo ka.
 
-[OP] Sabi ko, isang linggo pa lang. Bakit?
+[OP] Tama ba ang narinig ko? Isang trabaho? Kahit hindi ako nakatapos ng kolehiyo?
 
-[CHARACTER_M] Kasi... nakita kita sa bintana kahapon ng gabi. Mga alas dose ng hatinggabi. \
-Nakatayo ka sa likod ng bahay. Nakatingin sa lupa.
+[CHARACTER_M] Hindi importante ang degree, {op_name}. Ang importante ay ang sipag \
+at determinasyon. At nakikita ko iyon sa iyo.
 
-[OP] Hindi ako lumabas kahapon ng gabi. Natulog ako nang alas nuwebe.
+[NARRATOR] At sa maliit na tindahang iyon nagsimula ang lahat. Hindi niya alam na \
+ang mga natutunan niya doon — kung paano makipag-usap sa customer, kung paano \
+mag-manage ng puhunan, kung paano magbenta — ay magiging pundasyon ng kanyang imperyo.
 
-[NARRATOR] Tumahimik si {char_m} nang marinig niya iyon. At sa kanyang mukha — \
-nakita ko ang isang bagay na hindi ko gustong makita. Takot. \
-Hindi siya nagtitingin sa akin nang normal. Tinitingnan niya ako tulad ng isang tao \
-na hindi sigurado kung ang nakikita niya ay ang taong kakilala niya.
+[OP] Nagsimula ako sa pagtitinda ng mga second-hand na damit. Ukay-ukay. \
+Pumupunta ako sa Baclaran ng alas tres ng madaling araw, pumipili ng magagandang damit, \
+at ibinebenta sa aming baryo. Hindi malaki ang kita — P200, P300 isang araw. \
+Ngunit nag-ipon ako. Paunti-unti. Hindi ako gumastos ng kahit piso para sa sarili ko.
 
-[OP] Pagkatapos ng gabing iyon, nagsimulang mangyari ang mga bagay na hindi ko maintindihan. \
-Ang mga larawan sa dingding ay nakaharap nang kabaligtaran tuwing umaga. \
-Ang mga pinggan ay nasa ibang lugar kaysa inilagay ko. \
-At isang gabi, nang gumising ako sa hatinggabi, may nakita akong nakatayo sa sulok ng aking kwarto.
+[NARRATOR] Makalipas ang dalawang taon, mayroon na siyang sariling maliit na tindahan. \
+Makalipas ang limang taon — tatlong branches. Makalipas ang sampung taon — \
+isa na siyang CEO ng isang retail chain na may 50 branches sa buong bansa.
 
-[CHARACTER_F] Huwag kang matatakot. Nandito lang ako para bantayan ka.
+[OP] Ngayon, hindi ko na kailangang maglakad ng tatlong kilometro para pumasok \
+sa eskwela. Hindi ko na kailangang magtiis ng gutom. Ngunit hindi ko nakakalimutan \
+kung saan ako nagsimula. Bawat taon, bumabalik ako sa aming baryo at nagbibigay \
+ng scholarship sa mga batang katulad ko noon — walang pera ngunit puno ng pangarap.
 
-[OP] Ang boses. Ang boses ng aking {char_f}. Na namatay na tatlong taon na ang nakakaraan.
+[NARRATOR] Kaya mga kaibigan — ano ang aral na natutunan mo sa kwentong ito? \
+Na ang kahirapan ay hindi hadlang. Na ang sipag at tiyaga ay mas mahalaga kaysa sa \
+anuman. Na ang tagumpay ay hindi dumarating sa isang gabi — ito ay bunga ng \
+maraming taon ng pagsusumikap at pananampalataya.
 
-[NARRATOR] Mga kaibigan, hindi ko alam kung paano ninyo tatanggapin ang susunod na sasabihin ko. \
-Ngunit ito ang totoo. Kinausap ni {op_name} ang kanyang namatay na {char_f} \
-sa loob ng tatlumpung minuto sa gabi na iyon. At ang lahat ng sinabi nito \
-ay mga bagay na hindi posibleng malaman ng kahit sino.
-
-[OP] Sinabi niya sa akin ang tungkol sa baon sa likod ng bahay. Sinabi niya kung ano ito. \
-At sinabi niya kung bakit hindi ito dapat gambalain. Pero alam ninyo ang pinaka-nakakatakot? \
-Sinabi niya rin kung sino ang nagbaon doon. At ang pangalan na ibinigay niya \
-ay isang pangalan na nakilala ko — dahil iyon ang pangalan ng aking lolo.
-
-[NARRATOR] Kaya ngayon ay alam na ninyo kung bakit hindi na ako bumalik sa bahay na iyon. \
-At kung bakit, sa tuwing may nagsasabi sa akin na katha-isip lamang ang mga multo — \
-hindi na ako sumasagot. Dahil ang ilan sa atin ay nakaranas na ng mga bagay \
-na hindi kayang ipaliwanag ng agham. At ang ilan sa atin ay hindi na kailangang maniwala — \
-dahil natuklasan na nila ang totoo.
-
-Kung mayroon kayong karanasang katulad nito — o kung nakatira kayo sa lugar \
-na parang may iba ring naninirahan — ibahagi ninyo sa comments. \
+Kung mayroon kayong sariling kwento ng tagumpay — o kung kilala ninyo ang isang tao \
+na nagtagumpay sa kabila ng hirap — ibahagi ninyo sa comments. \
 Mag-subscribe para sa bagong kwento araw-araw."""

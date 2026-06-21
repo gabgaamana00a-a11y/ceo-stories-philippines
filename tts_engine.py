@@ -242,18 +242,58 @@ def _synthesize_segment(seg: ScriptSegment, path: str) -> tuple:
 
 
 def _group_captions(words: list, group_size: int = 4) -> list:
-
+    """Group word-level timestamps into caption groups of N words each."""
     caps = []
-
     for i in range(0, len(words), group_size):
-
         g = words[i:i+group_size]
-
         caps.append({"start": g[0]["start"], "end": g[-1]["end"],
-
                       "text": " ".join(w["word"] for w in g).upper(),
-
                       "speaker": g[0].get("speaker", "NARRATOR")})
+    return caps
+
+
+def _generate_captions_from_segments(segments: list, group_size: int = 5) -> list:
+    """Generate captions from segment text/duration when edge-tts doesn't
+    emit WordBoundary events (common with Filipino voices).
+
+    Distributes timing evenly across word groups based on character ratio.
+    """
+    caps = []
+    for seg in segments:
+        text = seg.get("text", "")
+        dur = seg.get("duration", 0)
+        speaker = seg.get("speaker", "NARRATOR")
+
+        if not text or dur <= 0:
+            continue
+
+        words = text.strip().split()
+        if not words:
+            continue
+
+        # Group words
+        for i in range(0, len(words), group_size):
+            group_words = words[i:i+group_size]
+            group_text = " ".join(group_words)
+
+            # Calculate timing based on character proportion within segment
+            total_chars = len(" ".join(words))
+            this_chars = len(group_text)
+            ratio = this_chars / total_chars if total_chars > 0 else 1.0
+
+            # Find position within segment
+            preceding_chars = len(" ".join(words[:i]))
+            start_ratio = preceding_chars / total_chars if total_chars > 0 else 0.0
+
+            cap_start = seg["start"] + start_ratio * dur
+            cap_end = cap_start + ratio * dur
+
+            caps.append({
+                "start": cap_start,
+                "end": cap_end,
+                "text": group_text.upper(),
+                "speaker": speaker,
+            })
 
     return caps
 
@@ -317,18 +357,22 @@ def generate_drama_audio(script: str, output_dir: str) -> dict:
 
     _concat(paths, combined)
 
+    # Build segments dict
+    seg_dicts = [{"speaker": s.speaker, "label": SPEAKER_LABELS.get(s.speaker, s.speaker),
+                   "text": s.text, "start": s.start, "duration": s.duration}
+                  for s in segments if s.audio_path]
+
+    # Generate captions: prefer word-boundary timestamps, fallback to text-based
+    if all_words:
+        captions = _group_captions(all_words)
+        print(f"[tts] Captions from word boundaries: {len(captions)}")
+    else:
+        captions = _generate_captions_from_segments(seg_dicts)
+        print(f"[tts] Captions from text-based timing: {len(captions)}")
+
     return {
-
         "audio_path":     combined,
-
-        "segments":       [{"speaker": s.speaker, "label": SPEAKER_LABELS.get(s.speaker, s.speaker),
-
-                            "text": s.text, "start": s.start, "duration": s.duration}
-
-                           for s in segments if s.audio_path],
-
-        "captions":       _group_captions(all_words),
-
+        "segments":       seg_dicts,
+        "captions":       captions,
         "total_duration": t,
-
     }

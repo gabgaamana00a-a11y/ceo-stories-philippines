@@ -1,17 +1,18 @@
 """
-main.py — Kwentong Multo pipeline orchestrator.
+main.py — CEO Stories Philippines pipeline orchestrator.
 
 Daily flow:
-  1. Pick horror story seed from rotating Filipino category
-  2. Generate original Tagalog horror script via OpenRouter
+  1. Pick CEO success story seed from rotating Filipino category
+  2. Generate original Tagalog CEO story script via OpenRouter
   3. Synthesize multi-voice TTS audio (Edge TTS — Filipino voices)
-  4. Render 1920x1080 YouTube video with Pexels B-roll + subtitles
-  5. Generate horror-style thumbnail
-  6. Upload to YouTube
+  4. Download real B-roll videos from Pexels/Pixabay (success-themed)
+  5. Render 1920x1080 YouTube video with subtitles over real video
+  6. Generate success-style thumbnail
+  7. Upload to YouTube
 
 Run manually:
     python main.py
-    python main.py --seed "Nakita ko ang aswang sa aming kapitbahay isang gabi"
+    python main.py --seed "Isang CEO na nagsimula sa pagtitinda ng fish balls"
     python main.py --no-upload
 """
 
@@ -41,18 +42,20 @@ def _extract_scene_tags(script: str) -> list[str]:
     lower = script.lower()
     tags = []
     scene_map = {
-        "gubat":      ["dark forest night", "foggy forest"],
-        "ilog":       ["river night dark", "dark water"],
-        "bahay":      ["dark house interior", "abandoned house"],
-        "ospital":    ["hospital corridor dark", "hospital night"],
-        "paaralan":   ["empty school corridor", "dark school"],
-        "kwarto":     ["dark bedroom", "dim room"],
-        "baryo":      ["rural village night", "tropical village dark"],
-        "abroad":     ["city night street", "dark apartment"],
-        "gabi":       ["dark night", "moonlit forest"],
-        "bundok":     ["dark mountain", "foggy forest path"],
-        "simbahan":   ["church dark interior", "old church night"],
-        "default":    ["dark forest night", "foggy path", "abandoned building"],
+        "negosyo":    ["office building modern", "business meeting"],
+        "opisina":    ["corporate office", "modern workplace"],
+        "probinsya":  ["rural philippines village", "simple life farming"],
+        "lungsod":    ["manila city skyline", "makati business"],
+        "bahay":      ["modern house interior", "filipino home"],
+        "tindahan":   ["small store business", "market philippines"],
+        "pamilya":    ["filipino family", "family gathering"],
+        "paaralan":   ["students studying", "school philippines"],
+        "abroad":     ["airport travel", "modern city abroad"],
+        "factory":    ["factory worker philippines", "manufacturing"],
+        "trabaho":    ["people working office", "corporate work"],
+        "construction": ["construction worker", "building construction"],
+        "pera":       ["money business", "financial success"],
+        "default":    ["successful businessman", "modern office", "city skyline philippines"],
     }
     for keyword, pexels_kws in scene_map.items():
         if keyword in lower:
@@ -65,67 +68,69 @@ def _extract_scene_tags(script: str) -> list[str]:
 # ── Title & description ───────────────────────────────────────────────────────
 
 # Keyword-matched punchy title pools — no raw seed text dumped in.
-# Top AITA channels use short emotional hooks, not full sentences.
+# Top channels use short emotional hooks, not full sentences.
 _TITLE_POOLS = [
-    (["aswang", "manananggal", "capiz"], [
-        "Nakita Ko ang Aswang — Totoo ang Mga Alamat ng Aming Baryo 😱 | Kwentong Multo",
-        "Ang Lihim ng Aming Kapit-Bahay ay Aswang Pala 😱 | Horror Story Tagalog",
-        "Kapre, Aswang, at ang Gabi na Magpakailanman Kong Aalalahanin | Kwentong Multo",
+    (["ceo", "corporation", "korporasyon", "presidente", "executive"], [
+        "Mula sa Wala, Naging CEO — Ang Kanyang Kwento ay Hindi Kapani-paniwala 💼 | CEO Stories",
+        "Siya ay Dati Mahirap — Ngayon CEO na ng Isang Multi-Million Company 🏆 | Tagalog Inspirasyon",
+        "Ang CEO na Dating Nakatira sa Bangketa — Hindi Mo Ito Akalain 💪 | Kwento ng Tagumpay",
     ]),
-    (["multo", "ghost", "white lady", "patay"], [
-        "Ang Multo na Hindi Alam na Patay Na Siya 👻 | Kwentong Multo Tagalog",
-        "White Lady sa Aming Bahay — Hindi Ito Alamat 😱 | True Horror Story",
-        "Nakita Ko ang Aking Namatay na Lola sa Salamin 😱 | Kwentong Horror",
+    (["negosyo", "business", "entrepreneur", "startup", "tindahan"], [
+        "P1,000 Lang ang Puhunan — Ngayon ay Millionaire Na Siya 💰 | CEO Stories Philippines",
+        "Mula sa Maliit na Tindahan — Nagtayo ng Business Empire 🏢 | Inspirational Story Tagalog",
+        "Ang Sikreto ng Tagumpay ng Negosyanteng Nagsimula sa Wala 🔥 | Kwento ng CEO",
     ]),
-    (["ofw", "abroad", "japan", "hong kong", "dubai", "saudi"], [
-        "OFW Horror Story — May Sumusunod sa Akin Mula sa Pilipinas 😱 | Kwentong Multo",
-        "Ang Aking Kwarto sa Abroad ay May Naninirahan na Hindi Ko Nakita | Horror",
-        "Nag-abroad Ako at Natuklasan Ko ang Pinaka-Nakakatakot na Bagay 👻 | OFW Horror",
+    (["ofw", "abroad", "dubai", "japan", "hongkong", "saudi", "canada", "taiwan"], [
+        "OFW na Naging CEO — Mula sa Pagiging Katulong Hanggang sa Pagmamay-ari ng Kumpanya ✈️ | CEO Stories",
+        "Nag-OFW Siya ng 10 Taon — Umuwi at Nagtayo ng Business Empire 🇵🇭 | Inspirasyon ng Pinoy",
+        "Ang OFW na Hindi Sumuko — Ngayon ay CEO na ng Kanyang Sariling Kumpanya 💼 | Tagalog Success",
     ]),
-    (["paaralan", "eskwelahan", "school", "kolehiyo", "unibersidad"], [
-        "Ang Multo sa Aming Eskwelahan — May Kaklase Kaming Hindi Tao 😱 | Horror Tagalog",
-        "Ang Kwarto 217 ng Aming Unibersidad ay Bawal Pumasok — Natuklasan Ko Kung Bakit | Horror",
-        "Namatay ang Aming Kaklase Ngunit Patuloy Siyang Dumadalo sa Klase 👻 | Kwentong Multo",
+    (["mahirap", "hirap", "walang pera", "bangketa", "tondo", "estero"], [
+        "Galing sa Basurahan — Ngayon ay Multi-Millionaire Na Siya 😱 | CEO Story Tagalog",
+        "Walang Makain Kundi Kanin at Asin — Ngayon ay CEO Na 🔥 | Kwento ng Tagumpay",
+        "Mula sa Kahirapan Tungo sa Tagumpay — Hindi Ka Maniniwala sa Kanyang Kwento 💪 | CEO Stories",
     ]),
-    (["ospital", "hospital", "nurse", "doktor"], [
-        "Nagtatrabaho Bilang Nurse — Ang Pasyente sa Kwarto 404 ay Hindi Naka-Admit 😱 | Horror",
-        "Ang Ospital na Ito ay May Lihim na Walang Gustong Ibahagi | Kwentong Multo",
-        "Ang Morgue ng Aming Ospital ay May Kakaibang Gawi 👻 | True Hospital Horror Story",
+    (["pamilya", "nanay", "tatay", "ina", "ama", "anak", "lola", "lolo"], [
+        "Iniwan ng Asawa Dahil sa Kahirapan — Ngayon ay CEO Na at Masaya 💪 | CEO Stories Philippines",
+        "Ang Anak na Nagsakripisyo para sa Pamilya — Ngayon ay CEO Na 🏆 | Tagalog Inspirasyon",
+        "Pamilya Sila na Nagsimula sa Wala — Ngayon ay May Business Empire 👨‍👩‍👧‍👦 | CEO Stories",
     ]),
-    (["probinsya", "baryo", "batangas", "ilocos", "visayas", "laguna"], [
-        "Ang Baryo ng Aming Pamilya ay May Lihim na Tatlong Henerasyon Nang Inililihim 😱",
-        "Ang Daan ng Patay sa Aming Probinsya — Natuklasan Ko Kung Bakit | Kwentong Multo",
-        "Natulog Kami sa Lumang Bahay sa Probinsya — Hindi Kami Nag-iisa 👻 | Horror Tagalog",
+    (["probinsya", "baryo", "batangas", "ilocos", "visayas", "laguna", "bukid"], [
+        "Taga-Probinsya Lang Siya — Ngayon ay CEO Ng Isang Malaking Korporasyon 🏢 | CEO Stories",
+        "Mula sa Baryo Tungo sa Boardroom — Ang Kwento ng Isang Batang Probinsyano 🌾 | Tagalog Success",
+        "Ang Batang Taga-Probinsya na Nagpatunay na Walang неможливо 💪 | CEO Stories Philippines",
     ]),
-    (["engkanto", "kapre", "tikbalang", "duwende", "dwende"], [
-        "Ang Kapre sa Puno ng Balete — Naniwala Ako na Alamat Lamang Ito 😱 | Kwentong Multo",
-        "Naligaw Kami sa Gubat at ang Duwende ang Nagligtas Sa Amin | Filipino Horror",
-        "Ang Engkanto ng Aming Ilog ay Naghingi ng Kapalit 👻 | Kwentong Multo Tagalog",
+    (["bagsak", "fail", "scam", "naloko", "nawalan", "bangkarote", "sumuko"], [
+        "Tatlong Beses na Bumagsak — Pero Hindi Sumuko — Ngayon ay CEO Na 🔥 | CEO Stories",
+        "Nawalan ng Lahat — Nagsimula Ulit — Ngayon ay Multi-Millionaire Na 💰 | Tagalog Inspirasyon",
+        "Ang Kwento ng Pagkabigo na Naging Tagumpay — Hindi Ka Maniniwala 📖 | CEO Stories Philippines",
     ]),
-    (["pamilya", "lola", "lolo", "ninuno", "curse"], [
-        "Ang Sumpa ng Aming Pamilya — Ikinuwento ng Aking Lola Bago Siya Pumanaw 😱",
-        "May Sumusunod sa Aming Lipi na Mula sa Kasalanan ng Aming Ninuno | Horror",
-        "Ang Lumang Baul na Hindi Dapat Buksan — Ngunit Binuksan Namin 👻 | Kwentong Multo",
+    (["tech", "startup", "app", "software", "programmer", "code", "digital"], [
+        "College Dropout na Nag-Code sa Internet Cafe — Ngayon ay CEO ng Tech Company 💻 | CEO Stories",
+        "Mula sa Garahe Hanggang sa Unicorn — Ang Kwento ng Isang Tech CEO 🚀 | Tagalog Success",
+        "Ang Programmer na Naging CEO — At Binili ang Dating Kumpanya Niya 💼 | CEO Stories Philippines",
     ]),
-    (["panaginip", "paranormal", "premonisyon"], [
-        "Paulit-Ulit Kong Nangangarap ng Parehong Babae — Ngayon ay Natuklasan Ko Kung Sino Siya 😱",
-        "Ang Aking Asawa ay Nagsasalita Habang Natutulog — Hindi Niya Ito Naalala 👻 | Horror",
-        "May Mga Larawang Hindi Ko Kinuha sa Aking Telepono — Nasa Loob ng Aming Bahay 😱",
+    (["revenge", "higanti", "iniwan", "niloko", "pinahiya", "tinanggal", "itinakwil"], [
+        "Pinahiya ng Dating Boss — Ngayon ay CEO at Ang Boss ay Nag-Aapply sa Kanya 😱 | CEO Stories",
+        "Niloko ng Business Partner — Nagtayo ng Mas Malaking Empire 💪 | Revenge CEO Story Tagalog",
+        "Itinakwil ng Mayamang Pamilya — Naging Mas Mayaman Pa Kaysa sa Kanilang Lahat 🔥 | CEO Stories",
+        "Tinanggal sa Trabaho — Nagtayo ng Karibal na Kumpanya — Binili ang Dating Kumpanya 🏢 | CEO Revenge",
+        "Iniwan ng Fiance Dahil Mahirap — Naging Bilyonaryo — Bumili ng Diamond Ring 💍 | CEO Stories",
     ]),
-    (["urban", "bgc", "makati", "quezon", "maynila", "manila", "lrt", "mrt"], [
-        "Ang Elevator ng Aming Opisina ay Palaging Humihinto sa Ikapitong Palapag 😱 | Urban Legend",
-        "Ang White Lady ng Balete Drive — Napatunayan Ko Ito Isang Gabi 👻 | Kwentong Multo",
-        "Ang LRT Station na Aming Ginagamit Araw-Araw ay May Lihim | Horror Tagalog",
+    (["babae", "nanay", "ina", "babaeng ceo", "woman", "female"], [
+        "Ang Babaeng CEO na Nagsimula sa Pagtitinda sa Palengke — Ngayon ay May Empire 👩‍💼 | CEO Stories",
+        "Isang Ina na Nagsakripisyo para sa Anak — Ngayon ay CEO ng Malaking Kumpanya 💪 | Tagalog Inspirasyon",
+        "Babaeng CEO na Hindi Nagsusungit — At Ang Kanyang Kwento ay Nakakaiyak 😢 | CEO Stories Philippines",
     ]),
 ]
 
 _GENERIC_TITLES = [
-    "Nakaranas Ako ng Bagay na Hindi Ko Kayang Ipaliwanag 😱 | Kwentong Multo Tagalog",
-    "Ang Pinakanakakatakot na Gabi ng Aking Buhay 👻 | True Horror Story Philippines",
-    "Hindi Ako Naniniwala sa Multo Noon — Hanggang sa Mangyari Ito Sa Akin 😱 | Kwentong Horror",
-    "Totoo Ba Ito? Ang Karanasang Hindi Ko Malilimutan 👻 | Kwentong Multo",
-    "Ang Lihim ng Aming Lugar na Ilang Taon Ko Nang Iniingatan 😱 | Horror Story Tagalog",
-    "Wala Akong Makausap — Dahil Sila ay Patay Na 👻 | Kwentong Multo Philippines",
+    "Mula sa Wala Hanggang sa Yaman — Ang Kwento ng Tagumpay na Dapat Mong Malaman 💰 | CEO Stories",
+    "Hindi Ka Maniniwala Kung Saan Siya Nagsimula — Ngayon CEO Na Siya 🔥 | Tagalog Success Story",
+    "Ang Pinaka-Inspirational na Kwento ng CEO na Makikita Mo Ngayong Araw 💪 | CEO Stories Philippines",
+    "Mula sa Hirap Tungo sa Tagumpay — Ang Kanyang Diskarte ay Hindi Kapani-paniwala 🏆 | CEO Stories",
+    "Siya ay Wala — Ngayon ay Isa Nang CEO — Heto Ang Kanyang Sikreto 🤫 | Tagalog Inspirasyon",
+    "Ang Batang Walang Pangarap — Ngayon ay CEO — Kung Paano Niya Binago ang Kanyang Buhay 📈 | CEO Stories",
 ]
 
 
@@ -135,13 +140,13 @@ def _make_title(story_seed: str) -> str:
     api_keys = get_openrouter_keys()
     if api_keys:
         prompt = (
-            f'Gumawa ng ISANG YouTube title para sa Tagalog horror video tungkol sa kwentong ito:\n"{story_seed}"\n\n'
+            f'Gumawa ng ISANG YouTube title para sa Tagalog CEO success story video tungkol sa kwentong ito:\n"{story_seed}"\n\n'
             "Mga Patakaran:\n"
             "- 50-80 character ang kabuuan\n"
             "- Tagalog ang salita (Filipino)\n"
-            "- Magsimula sa nakakatakot na hook — tulad ng: Nakita Ko, Natuklasan Ko, Hindi Ko Malilimutan\n"
-            "- Kasama ang ISANG emoji (😱 👻 😨 😐 o 🔊)\n"
-            "- Tapusin sa | Kwentong Multo o | Horror Tagalog\n"
+            "- Magsimula sa nakaka-inspire na hook — tulad ng: Mula sa Wala, Galing sa Hirap, Isang CEO na\n"
+            "- Kasama ang ISANG emoji (💼 💰 🔥 🏆 💪 o 📈)\n"
+            "- Tapusin sa | CEO Stories o | Tagalog Success o | CEO Stories Philippines\n"
             "- I-output LAMANG ang title, walang iba, walang quotes"
         )
         for key_idx, api_key in enumerate(api_keys):
@@ -191,33 +196,33 @@ def _make_title(story_seed: str) -> str:
 def _make_description(story_seed: str, title: str) -> str:
     hook = story_seed[:150] if len(story_seed) > 150 else story_seed
     hashtags = (
-        "#KwentongMulto #HorrorTagalog #PinoyHorror #KwentongHorror "
-        "#TotoonaKwento #AswangStory #MultoPhilippines #HorrorStoryPhilippines "
-        "#ScaryStories #TruePinoyHorror #OFWHorror #PinoyCreepypasta "
-        "#PhilippineHorror #TrueHorrorStory #KwentongSindak "
-        "#nakakatakot #multo #aswang #engkanto #filipinohorror"
+        "#CEOStories #TagalogSuccessStory #PinoyCEO #InspirasyonPinoy "
+        "#RagsToRiches #SuccessStoryPhilippines #OFWSuccess #PinoyEntrepreneur "
+        "#NegosyoStory #CEOPhilippines #MotivationTagalog #BusinessStory "
+        "#MulaSaWala #TagumpayNgPinoy #CEO #SuccessMindset "
+        "#SipagAtTiyaga #PinoyPride #EntrepreneurPhilippines #YamanStory"
     )
     return (
-        f"😱 {hook}\n"
-        f"Mag-comment ng 😱 kung naniniwala ka, o 💀 kung sa tingin mo ay kathang-isip lamang.\n\n"
-        f"Maligayang pagdating sa Kwentong Multo — ang channel ng mga totoong karanasan "
-        f"ng mga Pilipino sa mga bagay na hindi maipaliwanag. Aswang, multo, engkanto, "
-        f"at mga misteryong mula sa ating sariling kultura. "
-        f"Pakinggan hanggang sa katapusan — maaaring mayroon ka ring katulad na karanasan.\n\n"
+        f"💼 {hook}\n"
+        f"Mag-comment ng 💪 kung na-inspire ka, o 🔥 kung gusto mo ng ganitong klaseng kwento!\n\n"
+        f"Maligayang pagdating sa CEO Stories Philippines — ang channel ng mga totoong kwento "
+        f"ng tagumpay ng mga Pilipino. Mula sa kahirapan, OFW, maliit na negosyo — "
+        f"hanggang sa pagiging CEO at pagtatayo ng business empire. "
+        f"Patunayan na ang Pilipino ay kayang magtagumpay sa kabila ng lahat.\n\n"
         f"👇 IBOTO MO:\n"
-        f"😱 = Naniniwala ako sa kwento\n"
-        f"💀 = Kathang-isip lamang ito\n"
-        f"🤔 = Hindi ako sigurado\n\n"
+        f"💪 = Na-inspire ako sa kwentong ito\n"
+        f"🔥 = Gusto ko ng ganitong kwento araw-araw\n"
+        f"🙏 = May katulad akong kwento\n\n"
         f"⏱️ MGA KABANATA\n"
-        f"0:00 Ang Pinaka-Nakakatakot na Sandali\n"
-        f"0:30 Ang Buong Kwento\n"
-        f"2:00 Nagsimulang Maging Kakaiba\n"
-        f"3:30 Ang Pinaka-Nakakatakot na Bahagi\n"
-        f"5:00 Ang Nangyari Pagkatapos\n"
-        f"6:30 Totoo Ba Ito?\n\n"
-        f"🔔 Mag-subscribe at pindutin ang bel — bagong kwento ARAW-ARAW!\n"
-        f"👍 I-like kung nanatili ka hanggang sa katapusan\n"
-        f"📢 I-share sa iyong mga kaibigan na mahilig sa kwentong multo\n\n"
+        f"0:00 Ang Pinaka-Dramatikong Sandali\n"
+        f"0:30 Ang Simula ng Kwento\n"
+        f"2:00 Ang Pagsubok\n"
+        f"3:30 Ang Pagbabago\n"
+        f"5:00 Ang Tagumpay\n"
+        f"6:30 Aral ng Kwento\n\n"
+        f"🔔 Mag-subscribe at pindutin ang bel — bagong kwento ng inspirasyon ARAW-ARAW!\n"
+        f"👍 I-like kung nainspire ka hanggang sa katapusan\n"
+        f"📢 I-share sa iyong mga kaibigan na nangangailangan ng inspirasyon\n\n"
         f"{hashtags}"
     )
 
@@ -225,6 +230,12 @@ def _make_description(story_seed: str, title: str) -> str:
 # ── Music finder ──────────────────────────────────────────────────────────────
 
 def _find_music() -> str | None:
+    """Find a CC-licensed background music track for CEO success stories.
+
+    Uses the free Jamendo API to search for uplifting, inspirational,
+    corporate cinematic tracks — all CC-licensed (free for YouTube).
+    Returns path to a random cached track, or None.
+    """
     import requests as _requests
     music_dir = os.path.join(os.path.dirname(__file__), "music")
     os.makedirs(music_dir, exist_ok=True)
@@ -234,24 +245,26 @@ def _find_music() -> str | None:
         os.path.join(music_dir, f)
         for f in os.listdir(music_dir)
         if f.lower().endswith((".mp3", ".wav", ".ogg", ".m4a", ".flac"))
+        and not f.startswith("horror_")  # skip old horror music
     ]
-    if len(cached) >= 3:
+    if len(cached) >= 5:
         return random.choice(cached)
 
-    # ── Build a pool of 5 dramatic piano tracks via Jamendo ──────────────────
+    # ── Build a pool of 10 inspiring/success tracks via Jamendo ──────────────
     # All Jamendo tracks are CC-licensed (free for YouTube use).
-    # We search specifically for piano + emotional/cinematic mood tags.
-    POOL_TARGET = 5
+    POOL_TARGET = 10
     jamendo_id = os.getenv("JAMENDO_CLIENT_ID", "")
     if jamendo_id:
-        piano_searches = [
-            {"fuzzytags": "piano dramatic"},
-            {"fuzzytags": "piano cinematic"},
-            {"fuzzytags": "piano melancholic"},
-            {"fuzzytags": "piano sad emotional"},
-            {"tags": "piano"},
+        success_searches = [
+            {"fuzzytags": "uplifting inspirational cinematic"},
+            {"fuzzytags": "corporate inspirational motivational"},
+            {"fuzzytags": "hopeful inspiring emotional"},
+            {"tags": "cinematic"},
+            {"fuzzytags": "success motivational uplifting"},
+            {"fuzzytags": "inspiring corporate uplifting"},
+            {"tags": "inspirational"},
         ]
-        for search_params in piano_searches:
+        for search_params in success_searches:
             if len(cached) >= POOL_TARGET:
                 break
             try:
@@ -260,10 +273,11 @@ def _find_music() -> str | None:
                     params={
                         "client_id": jamendo_id,
                         "format": "json",
-                        "limit": 20,
+                        "limit": 30,
                         "orderby": "popularity_total",
                         "audioformat": "mp32",
                         "audiodlformat": "mp32",
+                        "durationmin": 60,
                         **search_params,
                     },
                     timeout=15,
@@ -271,27 +285,41 @@ def _find_music() -> str | None:
                 if resp.status_code != 200:
                     continue
                 tracks = resp.json().get("results", [])
-                tracks = [t for t in tracks if t.get("audiodownload_allowed") and t.get("audiodownload")]
-                # Shuffle top 10 so each run picks something different
-                pool = tracks[:10]
+                tracks = [t for t in tracks
+                          if t.get("audiodownload_allowed") and t.get("audiodownload")]
+                # Shuffle top 15 so each run picks different tracks
+                pool = tracks[:15]
                 random.shuffle(pool)
                 for track in pool:
                     if len(cached) >= POOL_TARGET:
                         break
-                    track_path = os.path.join(music_dir, f"jamendo_{track['id']}.mp3")
-                    if os.path.exists(track_path):
-                        cached.append(track_path)
+                    track_id = track["id"]
+                    # Skip if already cached
+                    existing = [c for c in cached if f"jamendo_{track_id}" in c]
+                    if existing:
                         continue
-                    r = _requests.get(track["audiodownload"], timeout=60, stream=True)
-                    if r.status_code == 200:
-                        with open(track_path, "wb") as f_out:
-                            for chunk in r.iter_content(chunk_size=65536):
-                                f_out.write(chunk)
-                        if os.path.getsize(track_path) > 50_000:
-                            print(f"[music] Downloaded: '{track.get('name')}' by {track.get('artist_name')} (CC license)")
-                            cached.append(track_path)
-                        else:
+                    track_path = os.path.join(music_dir, f"jamendo_{track_id}.mp3")
+                    try:
+                        r = _requests.get(
+                            track["audiodownload"], timeout=(8, 30), stream=True
+                        )
+                        if r.status_code == 200:
+                            with open(track_path, "wb") as f_out:
+                                for chunk in r.iter_content(chunk_size=65536):
+                                    if chunk:
+                                        f_out.write(chunk)
+                            if os.path.getsize(track_path) > 50_000:
+                                print(f"[music] Downloaded: '{track.get('name')}' "
+                                      f"by {track.get('artist_name')} (CC license) "
+                                      f"~{int(track.get('duration', 0))}s")
+                                cached.append(track_path)
+                            else:
+                                os.remove(track_path)
+                    except Exception as dl_err:
+                        print(f"[music] Download failed for {track.get('name')}: {dl_err}")
+                        if os.path.exists(track_path):
                             os.remove(track_path)
+                        continue
             except Exception as e:
                 print(f"[music] Jamendo search failed: {e}")
                 continue
@@ -299,9 +327,11 @@ def _find_music() -> str | None:
         print("[music] No JAMENDO_CLIENT_ID — get a free key at devportal.jamendo.com")
 
     if cached:
-        return random.choice(cached)
+        chosen = random.choice(cached)
+        print(f"[music] Using: {os.path.basename(chosen)}")
+        return chosen
 
-    print("[music] No music found — drop a dramatic piano MP3 into the music/ folder")
+    print("[music] No music found — place MP3 files in the music/ folder")
     return None
 
 
@@ -423,6 +453,7 @@ def create_drama_video(
     story_seed: str | None = None,
     output_dir: str | None = None,
     upload: bool = True,
+    story_minutes: int = 10,
 ) -> dict:
     """Run the full drama video pipeline. Returns result dict."""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -435,13 +466,13 @@ def create_drama_video(
 
     # ── 1. Story seed ─────────────────────────────────────────────────────────
     if not story_seed:
-        print("\n[1/6] Fetching trending story seed...")
+        print("\n[1/6] Fetching CEO success story seed...")
         story_seed = get_trending_drama_seed()
     print(f"  Seed: {story_seed[:85]}...")
 
     # ── 2. Script ─────────────────────────────────────────────────────────────
-    print("\n[2/6] Generating drama script...")
-    script = generate_drama_script(story_seed)
+    print("\n[2/6] Generating CEO success script...")
+    script = generate_drama_script(story_seed, target_minutes=story_minutes)
     script_path = os.path.join(output_dir, "script.txt")
     with open(script_path, "w", encoding="utf-8") as f:
         f.write(script)
@@ -453,8 +484,8 @@ def create_drama_video(
     dur = tts["total_duration"]
     print(f"  Duration: {dur:.1f}s ({dur/60:.1f} min) | {len(tts['segments'])} segments")
 
-    # ── 4. Video render ───────────────────────────────────────────────────────
-    print("\n[4/6] Rendering video...")
+    # ── 4. Video render (real B-roll + subtitles) ─────────────────────────────
+    print("\n[4/6] Rendering video with real B-roll + subtitles...")
     scene_tags = _extract_scene_tags(script)
     video_path = os.path.join(output_dir, "drama_video.mp4")
     render_drama_video(
@@ -463,11 +494,11 @@ def create_drama_video(
         segments=tts["segments"],
         output_path=video_path,
         scene_tags=scene_tags,
-        music_path=None,
+        music_path=_find_music(),
     )
 
     # ── 5. Thumbnail ──────────────────────────────────────────────────────────
-    print("\n[5/6] Generating thumbnail...")
+    print("\n[5/6] Generating success-style thumbnail...")
     title = _make_title(story_seed)
     thumb_path = os.path.join(output_dir, "thumbnail.png")
     generate_thumbnail(
@@ -523,10 +554,12 @@ def create_drama_video(
 
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser(description="Kwentong Multo — daily horror video generator")
-    parser.add_argument("--seed",      type=str,  default=None, help="Custom story seed")
+    parser = argparse.ArgumentParser(description="CEO Stories Philippines — success story video generator")
+    parser.add_argument("--seed",      type=str,  default=None, help="Custom CEO story seed")
     parser.add_argument("--no-upload", action="store_true",     help="Skip YouTube upload")
     parser.add_argument("--output",    type=str,  default=None, help="Output directory")
+    parser.add_argument("--long",      action="store_true",     help="Generate 30-min free story (no API costs)")
+    parser.add_argument("--minutes",   type=int,  default=None, help="Custom story length in minutes")
     args = parser.parse_args()
 
     try:
@@ -534,26 +567,27 @@ if __name__ == "__main__":
             story_seed=args.seed,
             output_dir=args.output,
             upload=not args.no_upload,
+            story_minutes=args.minutes or (30 if args.long else 10),
         )
         repo = os.getenv("GITHUB_REPOSITORY", "local")
         yt_url = result.get("youtube_url")
         if yt_url:
             _notify_telegram(
-                f"\u2705 <b>Kwentong Multo — Na-upload na!</b>\n\n"
-                f"\U0001f47b {result['title']}\n"
+                f"\u2705 <b>CEO Stories Philippines — Na-upload na!</b>\n\n"
+                f"\U0001f4bc {result['title']}\n"
                 f"\U0001f517 {yt_url}\n\n"
                 f"\U0001f4e6 Repo: {repo}"
             )
         elif not args.no_upload:
             _notify_telegram(
-                f"\u26a0\ufe0f <b>Kwentong Multo — Na-render pero hindi na-upload sa YouTube.</b>\n"
+                f"\u26a0\ufe0f <b>CEO Stories Philippines — Na-render pero hindi na-upload sa YouTube.</b>\n"
                 f"Tingnan ang Actions logs para sa detalye.\n\n"
                 f"\U0001f4e6 Repo: {repo}"
             )
     except Exception as exc:
         repo = os.getenv("GITHUB_REPOSITORY", "local")
         _notify_telegram(
-            f"\u274c <b>Kwentong Multo — Pipeline failed:</b>\n\n"
+            f"\u274c <b>CEO Stories Philippines — Pipeline failed:</b>\n\n"
             f"<code>{exc}</code>\n\n"
             f"\U0001f4e6 Repo: {repo}"
         )

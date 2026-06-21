@@ -1,4 +1,4 @@
-"""Central config for Kwentong Multo — Filipino horror & supernatural YouTube channel."""
+"""Central config for CEO Stories — Filipino success & rags-to-riches YouTube channel."""
 
 import os
 
@@ -20,26 +20,27 @@ def get_openrouter_keys() -> list[str]:
     return keys
 
 
-CHANNEL_NAME = "Kwentong Multo"
-CHANNEL_NICHE = "tagalog_horror"
+CHANNEL_NAME = "CEO Stories Philippines"
+CHANNEL_NICHE = "ceo_success_stories"
 
 # ── YouTube upload ────────────────────────────────────────────────────────────
 UPLOAD_PRIVACY  = "public"   # public | unlisted | private
 UPLOAD_CATEGORY = "22"       # 22 = People & Blogs
 UPLOAD_TAGS = [
-    # High-volume Tagalog horror searches
-    "kwentong multo", "multo", "horror story tagalog", "kwentong horror",
-    "tagalog horror stories", "kwentong aswang", "aswang story",
-    "kwentong totoo", "true horror story", "pinoy horror",
-    # Folklore creatures
-    "aswang", "manananggal", "kapre", "tikbalang", "duwende",
-    "engkanto", "white lady", "multo sa paaralan", "multo sa ospital",
-    # Format/discovery terms
-    "horror stories", "kwentong sindak", "nakakatakot na kwento",
-    "pinoy scary stories", "philippine folklore", "urban legend",
-    "ofw horror story", "probinsya horror",
+    # High-volume success/inspiration searches
+    "ceo story", "success story philippines", "rags to riches",
+    "pinoy success story", "negosyo story", "entrepreneur philippines",
+    "ofw success story", "buhay ceo", "yaman story",
+    "inspirational story tagalog", "motivational story philippines",
+    "sipag at tiyaga", "pinoy entrepreneur", "success mindset",
+    # Founder/business terms
+    "ceo philippines", "business story", "startup philippines",
+    "yumaman sa negosyo", "karanasan ng ceo", "tagumpay sa buhay",
+    "mahirap hanggang sa yumaman", "pinoy billionaire story",
+    "small business success", "ofw na naging ceo",
     # Engagement terms
-    "nakakatakot", "true story", "pinoy horror channel",
+    "inspirasyon", "motivation", "tagumpay", "pinoy pride",
+    "ceo stories", "filipino success", "youtube motivational",
 ]
 
 # ── Video format — 16:9 landscape for YouTube long-form ──────────────────────
@@ -83,37 +84,40 @@ SPEAKER_LABELS = {
     "KAIBIGAN":     "KAIBIGAN",
     "INA":          "INA",
     "AMA":          "AMA",
+    "BOSS":         "BOSS",
+    "MENTOR":       "MENTOR",
+    "INVESTOR":     "INVESTOR",
 }
 
-# ── Pexels B-roll scene mapping (horror-themed) ───────────────────────────────
+# ── Pexels B-roll scene mapping (success/inspiration themed) ──────────────────
 SCENE_KEYWORDS = {
-    "gabi":         ["dark night forest", "scary night"],
-    "bundok":       ["dark mountain forest", "foggy forest"],
-    "probinsya":    ["rural philippines", "tropical forest night"],
-    "bahay":        ["dark house interior", "abandoned house"],
-    "ospital":      ["hospital corridor dark", "hospital night"],
-    "paaralan":     ["empty school corridor", "dark school"],
-    "gubat":        ["dark jungle forest", "foggy forest path"],
-    "ilog":         ["river night", "dark water"],
-    "baryo":        ["rural village night", "tropical village dark"],
-    "abroad":       ["city night street", "dark apartment"],
-    "kwarto":       ["dark bedroom", "dim room interior"],
-    "kitchen":      ["dark kitchen", "dim kitchen interior"],
-    "default":      ["dark forest night", "foggy path", "abandoned building"],
+    "negosyo":      ["office workspace modern", "business meeting"],
+    "opisina":      ["corporate office interior", "modern office building"],
+    "probinsya":    ["rural philippines village", "simple life farming"],
+    "lungsod":      ["city skyline philippines", "makati city"],
+    "bahay":        ["simple house interior", "dream home luxury"],
+    "tindahan":     ["small store business", "market stall"],
+    "pamilya":      ["filipino family happy", "family dinner"],
+    "paaralan":     ["students studying", "classroom learning"],
+    "abroad":       ["airport travel", "modern city abroad"],
+    "factory":      ["factory worker", "manufacturing plant"],
+    "construction": ["construction worker", "building site"],
+    "office":       ["people working office", "corporate meeting"],
+    "default":      ["successful businessman", "modern office", "city skyline"],
 }
 
-# ── Horror story categories for sustainable 365-day rotation ──────────────────
-HORROR_CATEGORIES = [
-    "aswang_folklore",      # aswang, manananggal, berberoka, sigbin
-    "engkanto_spirits",     # engkanto, diwata, kapre, tikbalang, duwende
-    "multo_ghost",          # white lady, school ghosts, house haunting
-    "ofw_horror",           # overseas Filipino worker supernatural encounters
-    "paaralan_horror",      # school/university ghost stories
-    "ospital_horror",       # hospital ghost stories
-    "probinsya_horror",     # province rural supernatural stories
-    "urban_legend",         # Metro Manila / Cebu city urban legends
-    "pamilya_horror",       # family supernatural/curse stories
-    "panaginip_paranormal", # dreams, premonitions, paranormal
+# ── CEO story categories for sustainable 365-day rotation ─────────────────────
+CEO_CATEGORIES = [
+    "rags_to_riches",       # Mahirap → yumaman sa sipag
+    "ofw_success",          # OFW na naging CEO / negosyante
+    "small_business",       # Mula sa maliit na tindahan → malaking negosyo
+    "startup_story",        # Tech startup, innovation
+    "overseas_dream",       # Pinoy na nagtagumpay sa abroad
+    "family_business",      # Pampamilyang negosyo na lumago
+    "failure_to_success",   # Bagsak → bumangon → nagtagumpay
+    "pinoy_ceo",            # Kilalang Pinoy CEO / entrepreneur story
+    "humble_beginning",     # Mula sa hirap ng buhay → tagumpay
+    "business_lesson",      # Aral sa negosyo at buhay CEO
 ]
 
 # ── Schedule (Philippine Standard Time UTC+8 = prime time 8-9 PM PST) ────────

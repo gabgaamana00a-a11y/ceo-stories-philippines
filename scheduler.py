@@ -23,7 +23,7 @@ def _default_config():
         "schedules": [
             {
                 "id": "slot_morning",
-                "niche": "math_quiz",
+                "niche": "ceo_success_stories",
                 "count": 1,
                 "hour": 8,   # 08:00 UTC = 4:00 PM PHT
                 "minute": 0,
@@ -32,7 +32,7 @@ def _default_config():
             },
             {
                 "id": "slot_afternoon",
-                "niche": "math_quiz",
+                "niche": "ceo_success_stories",
                 "count": 1,
                 "hour": 13,
                 "minute": 0,
@@ -41,7 +41,7 @@ def _default_config():
             },
             {
                 "id": "slot_evening",
-                "niche": "math_quiz",
+                "niche": "ceo_success_stories",
                 "count": 1,
                 "hour": 18,
                 "minute": 0,

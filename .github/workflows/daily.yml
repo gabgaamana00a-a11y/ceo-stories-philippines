@@ -1,11 +1,11 @@
-name: Daily Kwentong Multo Video
+name: Daily CEO Stories Philippines
 
 # ── Triggers ──────────────────────────────────────────────────────────────────
 on:
   schedule:
-    # 4 PM Philippine Time (PHT = UTC+8) = 08:00 UTC
-    # Schedule 1 hr early (07:00 UTC) to compensate for GitHub Actions runner delay
-    - cron: "0 7 * * *"
+    # 6 PM Philippine Time (PHT = UTC+8) = 10:00 UTC
+    # Schedule 1 hr early (09:00 UTC) to compensate for GitHub Actions runner delay
+    - cron: "0 9 * * *"
   workflow_dispatch:
     inputs:
       story_seed:
@@ -26,7 +26,7 @@ permissions:
 # ── Job ───────────────────────────────────────────────────────────────────────
 jobs:
   generate-and-upload:
-    name: Generate + Upload Kwentong Multo Video
+    name: Generate + Upload CEO Stories Video
     runs-on: ubuntu-latest
     timeout-minutes: 90
 
@@ -86,7 +86,7 @@ jobs:
           python -c "import json,sys; json.load(open('credentials.json')); print('credentials.json OK')"
 
       # ── 6. Run pipeline ──────────────────────────────────────────────────────
-      - name: Generate horror story video
+      - name: Generate CEO success story video
         env:
           OPENROUTER_API_KEY:    ${{ secrets.OPENROUTER_API_KEY }}
           OPENROUTER_API_KEY_2:  ${{ secrets.OPENROUTER_API_KEY_2 }}

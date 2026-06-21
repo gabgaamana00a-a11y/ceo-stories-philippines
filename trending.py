@@ -1,9 +1,9 @@
 """
-trending.py — Pick story seeds for Kwentong Multo.
+trending.py — Pick story seeds for CEO Stories Philippines.
 
-Strategy: rotate through 10 horror sub-categories from topics.json,
+Strategy: rotate through CEO success sub-categories from topics.json,
 ensuring variety across the full year.  No external API needed — fully
-self-contained so the pipeline runs forever without Reddit or scraping.
+self-contained so the pipeline runs forever.
 """
 
 import json
@@ -15,18 +15,20 @@ _TOPICS_FILE     = os.path.join(os.path.dirname(__file__), "topics.json")
 _USED_SEEDS_FILE = os.path.join(os.path.dirname(__file__), "used_topics.json")
 
 
-# ── Category rotation order (10 categories = 10-day cycle) ───────────────────
+# ── Category rotation order (12 categories = 12-day cycle) ───────────────────
 _CATEGORY_ORDER = [
-    "aswang_folklore",
-    "multo_ghost",
-    "ofw_horror",
-    "paaralan_horror",
-    "engkanto_spirits",
-    "ospital_horror",
-    "probinsya_horror",
-    "urban_legend",
-    "pamilya_horror",
-    "panaginip_paranormal",
+    "rags_to_riches",
+    "ofw_success",
+    "small_business",
+    "startup_story",
+    "overseas_dream",
+    "family_business",
+    "failure_to_success",
+    "pinoy_ceo",
+    "humble_beginning",
+    "business_lesson",
+    "ceo_revenge",
+    "rags_to_riches",
 ]
 
 
@@ -34,7 +36,7 @@ def _load_topics() -> dict:
     try:
         with open(_TOPICS_FILE, encoding="utf-8") as f:
             data = json.load(f)
-        return data.get("tagalog_horror", {})
+        return data.get("ceo_success_stories", {})
     except Exception as e:
         print(f"[trending] topics.json load error: {e}")
         return {}
@@ -62,7 +64,7 @@ def _get_todays_category() -> str:
 
 
 def get_trending_drama_seed() -> str:
-    """Return a horror story seed from today'"'"'s rotating category."""
+    """Return a CEO success story seed from today's rotating category."""
     topics = _load_topics()
     used   = _load_used_seeds()
 

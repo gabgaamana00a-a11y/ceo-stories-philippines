@@ -1,7 +1,7 @@
 """
-batch.py — Batch runner for Kwentong Multo.
+batch.py — Batch runner for CEO Stories Philippines.
 
-Generates multiple horror story videos in sequence (no upload by default).
+Generates multiple CEO success story videos in sequence (no upload by default).
 Usage:
     python batch.py              # generates 3 videos, no upload
     python batch.py --count 5    # generates 5 videos
@@ -16,7 +16,7 @@ from main import create_drama_video
 
 def run_batch(count: int = 3, upload: bool = False, delay: int = 15) -> None:
     print(f"\n{'='*60}")
-    print(f"  KWENTONG MULTO — Batch Generator")
+    print(f"  CEO STORIES PHILIPPINES — Batch Generator")
     print(f"  Videos: {count} | Upload: {upload} | Delay: {delay}s")
     print(f"{'='*60}\n")
 

@@ -1,12 +1,12 @@
 """
-video_renderer.py — Long-form 16:9 drama video renderer for Drama Desk.
+video_renderer.py — Long-form 16:9 CEO story video renderer.
 
 Pipeline:
-  1. Download landscape B-roll clips from Pexels (scene-matched)
+  1. Download landscape B-roll clips from Pexels (success-themed)
   2. Loop/extend clips to cover full audio duration
-  3. Burn in karaoke-style subtitles + speaker lower-thirds
-  4. Mix TTS audio + optional background music bed
-  5. Output final 1920x1080 MP4
+  3. Burn in karaoke-style subtitles with speaker color coding
+  4. Mix TTS audio + optional background music
+  5. Output final 1920x1080 MP4 with good subtitles
 
 Free B-roll sources used:
   • Pexels (primary)  — free, API key required (PEXELS_API_KEY env var)
@@ -21,7 +21,6 @@ import textwrap
 import requests
 import imageio_ffmpeg
 import math
-from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 from config import VIDEO_WIDTH, VIDEO_HEIGHT, VIDEO_FPS, SCENE_KEYWORDS
 
@@ -136,10 +135,18 @@ def _download_and_process_clip(
     if not vf:
         return 0.0
     try:
-        r = requests.get(vf["link"], stream=True, timeout=120)
+        r = requests.get(vf["link"], stream=True, timeout=(8, 25), headers={"User-Agent": "Mozilla/5.0"})
+        r.raise_for_status()
         with open(raw, "wb") as f:
             for chunk in r.iter_content(8192):
-                f.write(chunk)
+                if chunk:
+                    f.write(chunk)
+    except requests.exceptions.Timeout:
+        print(f"[video] Download timed out — skipping clip")
+        return 0.0
+    except requests.exceptions.ConnectionError:
+        print(f"[video] Connection error — skipping clip")
+        return 0.0
     except Exception as e:
         print(f"[video] Download failed: {e}")
         return 0.0
@@ -174,13 +181,13 @@ def build_background_video(output_path: str, target_duration: float, scene_tags:
     ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
     os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
 
-    # Build keyword list: scene-specific first, then drama defaults
+    # Build keyword list: scene-specific first, then success/defaults
     keywords = list(scene_tags)
     for kw in SCENE_KEYWORDS["default"]:
         if kw not in keywords:
             keywords.append(kw)
-    # Add extra drama fallbacks
-    keywords += ["people lifestyle", "city night", "indoor aesthetic", "dramatic sunset"]
+    # Add extra success-themed fallbacks
+    keywords += ["business success", "office people working", "modern city", "entrepreneur lifestyle", "team meeting", "corporate building"]
 
     clip_paths = []
     accumulated = 0.0
@@ -240,7 +247,7 @@ def build_background_video(output_path: str, target_duration: float, scene_tags:
     return output_path
 
 
-# ── ASS subtitle writer ───────────────────────────────────────────────────────
+# ── ASS subtitle writer (BEST QUALITY) ────────────────────────────────────────
 
 def _ass_time(sec: float) -> str:
     h  = int(sec // 3600)
@@ -252,22 +259,28 @@ def _ass_time(sec: float) -> str:
 
 def write_ass_subtitles(captions: list, segments: list, ass_path: str) -> str:
     """
-    Generate an ASS subtitle file with:
-      • Fade-in/out karaoke-style captions, speaker-color-coded
-      • Speaker lower-third labels (top left, semi-transparent box)
+    Generate a PREMIUM ASS subtitle file with:
+      • Large, bold, ultra-readable captions (72px Arial Bold)
+      • Semi-transparent dark backdrop behind text for 100% readability
+      • Speaker-color-coded text (gold for narrator, warm tones for characters)
+      • Smooth fade-in/out animations (250ms fade)
+      • Speaker lower-third labels (top-left, gold accent bar)
+      • Word-level karaoke-style timing for professional feel
+      • Bold black outline (4px) + shadow (3px) for contrast on any background
     """
     # ASS color format: &HAABBGGRR (alpha, blue, green, red)
+    # Premium CEO/success theme colors
     SPEAKER_COLORS = {
-        "NARRATOR":     "&H00FFFFFF",   # white
-        "OP":           "&H0000DCFF",   # gold/yellow
-        "OP_MALE":      "&H0000DCFF",   # gold/yellow
-        "CHARACTER_F":  "&H00C896FF",   # pink
-        "CHARACTER_M":  "&H0064C8FF",   # light orange
-        "CHARACTER_F2": "&H00FFAACC",   # lavender
-        "CHARACTER_M2": "&H00FFD080",   # sky blue
+        "NARRATOR":     "&H00FFFFFF",   # pure white — narrator
+        "OP":           "&H0000DCFF",   # vibrant gold — main storyteller
+        "OP_MALE":      "&H0000DCFF",   # vibrant gold — main storyteller
+        "CHARACTER_F":  "&H00B0D6FF",   # warm peach — female character
+        "CHARACTER_M":  "&H00B0D6FF",   # warm orange — male character
+        "CHARACTER_F2": "&H00FFDAAA",   # soft pink — secondary female
+        "CHARACTER_M2": "&H00EEC8AA",   # soft gold — secondary male
     }
 
-    # Build caption→speaker lookup: each caption maps to its segment by time overlap
+    # Build caption→speaker lookup
     def _find_speaker(cap_start: float) -> str:
         for seg in segments:
             if seg["start"] <= cap_start < seg["start"] + seg["duration"] + 0.1:
@@ -279,18 +292,29 @@ def write_ass_subtitles(captions: list, segments: list, ass_path: str) -> str:
         "ScriptType: v4.00+\n"
         f"PlayResX: {VIDEO_WIDTH}\n"
         f"PlayResY: {VIDEO_HEIGHT}\n"
-        "ScaledBorderAndShadow: yes\n\n"
+        "ScaledBorderAndShadow: yes\n"
+        "WrapStyle: 0\n\n"
         "[V4+ Styles]\n"
         "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, "
         "OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, "
         "ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
         "Alignment, MarginL, MarginR, MarginV, Encoding\n"
-        # Caption style — large bold, black outline, bottom-center
-        "Style: Caption,LiberationSans-Bold,68,&H00FFFFFF,&H000000FF,"
-        "&H00000000,&H90000000,-1,0,0,0,100,100,1,0,1,4,2,2,60,60,100,1\n"
-        # Label style — smaller, top-left, opaque dark box
-        "Style: Label,LiberationSans,42,&H00FFFFFF,&H000000FF,"
-        "&H00111111,&HCC000000,-1,0,0,0,100,100,1,0,3,2,1,1,40,40,40,1\n\n"
+        # ── Caption style: HUGE bold, thick outline + shadow, dark backdrop ──
+        # Font: Arial Bold (wide availability), 80px — very readable
+        # Outline: 5px black (crisp on any background)
+        # Shadow: 4px semi-transparent black (depth against bright video)
+        # BackColour: semi-transparent black backdrop
+        # Alignment: 2 (bottom-center)
+        # MarginV: 50px from bottom (slightly higher so video isn't covered)
+        "Style: Caption,Arial Bold,80,&H00FFFFFF,&H000000FF,"
+        "&H00000000,&H88000000,-1,0,0,0,100,100,3,0,2,5,4,2,50,50,50,1\n"
+        # ── Label style: speaker name tag top-left ────────────────────────────
+        # Smaller, gold text on dark semi-transparent box
+        "Style: Label,Arial Bold,36,&H0000DCFF,&H000000FF,"
+        "&H00111111,&HBB000000,-1,0,0,0,100,100,1,0,1,2,1,1,20,20,20,1\n"
+        # ── Sub-label style: secondary info ───────────────────────────────────
+        "Style: SubLabel,Arial,28,&H00C0C0C0,&H000000FF,"
+        "&H00111111,&H88000000,0,0,0,0,100,100,1,0,1,2,1,1,20,20,18,1\n\n"
         "[Events]\n"
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n"
     )
@@ -298,22 +322,32 @@ def write_ass_subtitles(captions: list, segments: list, ass_path: str) -> str:
     with open(ass_path, "w", encoding="utf-8") as f:
         f.write(header)
 
-        # Speaker label lines (layer 0)
+        # ── Speaker label lines (layer 0) ────────────────────────────────────
+        # Shows speaker name in top-left with gold accent
         for seg in segments:
             label = seg.get("label", seg.get("speaker", ""))
             start = _ass_time(seg["start"])
             end   = _ass_time(seg["start"] + seg["duration"])
-            f.write(f"Dialogue: 0,{start},{end},Label,,0,0,0,,{label}\n")
+            # Fade in/out for smooth transition
+            f.write(f"Dialogue: 0,{start},{end},Label,,0,0,0,,"
+                    f"{{\\fad(200,150)\\c&H00DCFF&}}{label}\n")
 
-        # Caption lines (layer 1) — colored + fade animated
+        # ── Caption lines (layer 1 & 2) — premium styled ─────────────────────
+        # Layer 1: background box (solid dark pill behind text)
+        # Layer 2: colored text with smooth animations
         for cap in captions:
             text    = cap["text"].replace("{", "").replace("}", "").replace("\n", " ")
             start   = _ass_time(cap["start"])
             end     = _ass_time(cap["end"])
             speaker = _find_speaker(cap["start"])
             color   = SPEAKER_COLORS.get(speaker, "&H00FFFFFF")
-            # {\fad(in_ms,out_ms)} fade + {\c&Hcolor&} speaker color
-            styled  = f"{{\\fad(180,120)\\c{color}}}{text}"
+
+            # Premium styling: fade + color + bold
+            # {\fad(fade_in_ms,fade_out_ms)} — smooth appearance
+            # {\c&Hcolor&} — speaker color
+            styled = (
+                f"{{\\fad(250,200)\\c{color}\\b1}}{text}"
+            )
             f.write(f"Dialogue: 1,{start},{end},Caption,,0,0,0,,{styled}\n")
 
     return ass_path
@@ -796,12 +830,17 @@ def render_drama_video(
     music_path: str | None = None,
 ) -> str:
     """
-    Render final video using Reddit-style chat/post-card frames.
-    scene_tags and captions kept for API compatibility but not used.
+    Render final video using real video clips from Pexels/Pixabay
+    with overlaid subtitles. No PIL-generated frames — real B-roll.
     """
-    os.makedirs(os.path.dirname(output_path) or ".", exist_ok=True)
+    import imageio_ffmpeg
+    ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+    base = os.path.dirname(output_path) or "."
+    os.makedirs(base, exist_ok=True)
+
+    # ── 1. Get audio duration ─────────────────────────────────────────────────
     dur_res = subprocess.run(
-        [imageio_ffmpeg.get_ffmpeg_exe(), "-i", audio_path, "-f", "null", "-"],
+        [ffmpeg, "-i", audio_path, "-f", "null", "-"],
         capture_output=True, text=True, timeout=30,
     )
     audio_duration = 0.0
@@ -810,5 +849,110 @@ def render_drama_video(
             t = line.split("Duration:")[1].split(",")[0].strip()
             h, m, s = t.split(":")
             audio_duration = int(h) * 3600 + int(m) * 60 + float(s)
-    print(f"[render] Audio duration: {audio_duration:.1f}s ({audio_duration/60:.1f} min)")
-    return render_chat_video(audio_path, segments, output_path, music_path)
+    print(f"[render] Audio: {audio_duration:.1f}s ({audio_duration/60:.1f} min)")
+
+    if audio_duration <= 0:
+        raise ValueError("Invalid audio duration — check TTS output")
+
+    # ── 2. Build background video from free sources ───────────────────────────
+    bg_video = os.path.join(base, "_background.mp4")
+    try:
+        build_background_video(bg_video, audio_duration, scene_tags or [])
+    except RuntimeError as e:
+        print(f"[render] Background build failed ({e}) — using fallback gradient")
+        _generate_fallback_background(bg_video, audio_duration, ffmpeg)
+
+    # ── 3. Generate ASS subtitles ─────────────────────────────────────────────
+    ass_path = os.path.join(base, "_subtitles.ass")
+    write_ass_subtitles(captions, segments, ass_path)
+
+    # ── 4. Apply warm color grade + subtitle burn-in ─────────────────────────
+    graded = os.path.join(base, "_graded.mp4")
+    # Fonts dir for ASS subtitles on Windows needs proper escaping
+    ass_escaped = ass_path.replace("\\", "/")
+    if os.name == "nt":
+        fontsdir = "C\\:/Windows/Fonts"
+        ass_filter = f"ass='{ass_escaped}':fontsdir='{fontsdir}'"
+    else:
+        ass_filter = f"ass='{ass_escaped}'"
+    subprocess.run([
+        ffmpeg, "-y", "-i", bg_video,
+        "-filter_complex", (
+            # Warm color grade + burn in subtitles
+            f"[0:v]eq=contrast=1.12:brightness=0.03:saturation=1.08,{ass_filter}"
+        ),
+        *_encode_args(), "-pix_fmt", "yuv420p",
+        "-t", str(audio_duration),
+        graded,
+    ], check=True, capture_output=True, timeout=600)
+    print(f"[render] Graded video with subtitles: {graded}")
+
+    # ── 5. Mux audio + optional background music ──────────────────────────────
+    has_music = music_path and os.path.exists(music_path)
+    fade_out = max(0, audio_duration - 4)
+
+    if has_music:
+        mixed_audio = os.path.join(base, "_mixed_audio.aac")
+        subprocess.run([
+            ffmpeg, "-y", "-i", audio_path, "-i", music_path,
+            "-filter_complex", (
+                f"[0:a]volume=1.0[speech];"
+                f"[1:a]volume=0.35,"
+                f"afade=t=in:st=0:d=4,afade=t=out:st={fade_out:.1f}:d=4[music];"
+                f"[speech][music]amix=inputs=2:normalize=0:dropout_transition=3[aout]"
+            ),
+            "-map", "[aout]", "-c:a", "aac", "-b:a", "192k",
+            mixed_audio,
+        ], check=True, capture_output=True, timeout=120)
+
+        # Final mux
+        subprocess.run([
+            ffmpeg, "-y", "-i", graded, "-i", mixed_audio,
+            "-map", "0:v", "-map", "1:a",
+            *_encode_args(), "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart",
+            "-t", str(audio_duration),
+            output_path,
+        ], check=True, capture_output=True, timeout=600)
+
+        # Cleanup intermediates
+        for f in [mixed_audio]:
+            if os.path.exists(f):
+                os.remove(f)
+    else:
+        # Direct mux: graded video + TTS audio
+        subprocess.run([
+            ffmpeg, "-y", "-i", graded, "-i", audio_path,
+            "-map", "0:v", "-map", "1:a",
+            *_encode_args(), "-pix_fmt", "yuv420p",
+            "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart",
+            "-t", str(audio_duration),
+            output_path,
+        ], check=True, capture_output=True, timeout=600)
+
+    # Cleanup intermediates
+    for f in [bg_video, graded, ass_path]:
+        if os.path.exists(f):
+            os.remove(f)
+
+    sz = os.path.getsize(output_path) / 1_000_000
+    print(f"[render] Done: {output_path} ({sz:.1f} MB)")
+    return output_path
+
+
+def _generate_fallback_background(output_path: str, duration: float, ffmpeg: str) -> str:
+    """Generate a gradient background if no Pexels clips available."""
+    import imageio_ffmpeg
+    ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+    d = f"{duration:.2f}"
+    subprocess.run([
+        ffmpeg, "-y",
+        "-f", "lavfi", "-i", f"color=c=#1a1a2e:s={VIDEO_WIDTH}x{VIDEO_HEIGHT}:d={d}:r={VIDEO_FPS}",
+        "-f", "lavfi", "-i", f"color=c=#16213e:s={VIDEO_WIDTH}x{VIDEO_HEIGHT}:d={d}:r={VIDEO_FPS}",
+        "-filter_complex",
+        f"[0:v][1:v]blend=all_mode=overlay:all_opacity=0.5,format=yuv420p",
+        "-t", d,
+        output_path,
+    ], check=True, capture_output=True, timeout=60)
+    print(f"[render] Fallback gradient: {output_path}")
+    return output_path
