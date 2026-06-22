@@ -21,6 +21,7 @@ import textwrap
 import requests
 import imageio_ffmpeg
 import math
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 from config import VIDEO_WIDTH, VIDEO_HEIGHT, VIDEO_FPS, SCENE_KEYWORDS
 

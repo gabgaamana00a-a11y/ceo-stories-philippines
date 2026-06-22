@@ -120,6 +120,8 @@ CEO_CATEGORIES = [
     "business_lesson",      # Aral sa negosyo at buhay CEO
 ]
 
-# ── Schedule (Philippine Standard Time UTC+8 = prime time 8-9 PM PST) ────────
-SCHEDULE_HOUR   = 8    # 08:00 UTC = 4:00 PM PHT (Philippine Time, UTC+8)
+# ── Schedule (Philippine Standard Time UTC+8) ────────────────────────────────
+# Prime time for PH audience: 6-9 PM PHT = 10:00-13:00 UTC
+# Upload at 10:00 UTC = 6:00 PM PHT (start of prime time)
+SCHEDULE_HOUR   = 10   # 10:00 UTC = 6:00 PM PHT (PH prime time)
 SCHEDULE_MINUTE = 0

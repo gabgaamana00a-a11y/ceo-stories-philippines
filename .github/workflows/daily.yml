@@ -18,6 +18,17 @@ on:
         default: "true"
         type: choice
         options: ["true", "false"]
+      long:
+        description: "Generate 30-min free story (no OpenRouter cost)?"
+        required: false
+        default: "false"
+        type: choice
+        options: ["true", "false"]
+      minutes:
+        description: "Custom story length in minutes (e.g. 45)"
+        required: false
+        default: ""
+
 
 # ── Permissions ───────────────────────────────────────────────────────────────
 permissions:
@@ -28,7 +39,7 @@ jobs:
   generate-and-upload:
     name: Generate + Upload CEO Stories Video
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 180
 
     steps:
       # ── 1. Checkout ─────────────────────────────────────────────────────────
@@ -43,11 +54,17 @@ jobs:
           cache: pip
 
       # ── 3. System deps ───────────────────────────────────────────────────────
+      # PIL/thumbnail needs: ffmpeg, fonts (Impact, Arial, Noto), libfontconfig
       - name: Install system dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y ffmpeg libfontconfig1 espeak-ng \
-            fonts-liberation fonts-dejavu-core fonts-noto-core
+          sudo apt-get install -y ffmpeg libfontconfig1 \
+            fonts-liberation fonts-liberation2 fonts-dejavu-core \
+            fonts-noto-core fonts-noto-extra fonts-noto-color-emoji \
+            ttf-mscorefonts-installer 2>/dev/null || true
+          # Download Impact font (used by thumbnail) if not available
+          fc-list | grep -i impact || echo "Impact font not found, using Liberation Sans"
+          fc-list | grep -i arial || echo "Arial not found, using Liberation Sans"
 
       # ── 3b. Cache Kokoro model weights (~115 MB total, avoid re-downloading daily) ─
       - name: Cache Kokoro model
@@ -104,14 +121,20 @@ jobs:
         run: |
           SEED="${{ github.event.inputs.story_seed }}"
           UPLOAD="${{ github.event.inputs.upload }}"
+          LONG="${{ github.event.inputs.long }}"
+          MINUTES="${{ github.event.inputs.minutes }}"
 
-          # Scheduled runs: always upload
+          # Scheduled runs: always upload, normal length
           if [ -z "$UPLOAD" ]; then UPLOAD="true"; fi
+          if [ -z "$LONG" ]; then LONG="false"; fi
 
           ARGS=""
           if [ -n "$SEED" ]; then ARGS="--seed \"$SEED\""; fi
           if [ "$UPLOAD" = "false" ]; then ARGS="$ARGS --no-upload"; fi
+          if [ "$LONG" = "true" ]; then ARGS="$ARGS --long"; fi
+          if [ -n "$MINUTES" ]; then ARGS="$ARGS --minutes $MINUTES"; fi
 
+          echo "Running: python main.py $ARGS"
           python main.py $ARGS
 
       # ── 7. Persist used seed + title lists ──────────────────────────────────────────────

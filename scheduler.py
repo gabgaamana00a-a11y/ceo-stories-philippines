@@ -22,28 +22,28 @@ def _default_config():
         "enabled": True,
         "schedules": [
             {
-                "id": "slot_morning",
+                "id": "slot_prime",
                 "niche": "ceo_success_stories",
                 "count": 1,
-                "hour": 8,   # 08:00 UTC = 4:00 PM PHT
+                "hour": 10,  # 10:00 UTC = 6:00 PM PHT (PH prime time)
                 "minute": 0,
                 "upload": True,
                 "active": True,
             },
             {
-                "id": "slot_afternoon",
+                "id": "slot_late",
                 "niche": "ceo_success_stories",
                 "count": 1,
-                "hour": 13,
+                "hour": 12,  # 12:00 UTC = 8:00 PM PHT (PH late prime)
                 "minute": 0,
                 "upload": True,
                 "active": True,
             },
             {
-                "id": "slot_evening",
+                "id": "slot_midnight",
                 "niche": "ceo_success_stories",
                 "count": 1,
-                "hour": 18,
+                "hour": 22,  # 22:00 UTC = 6:00 AM PHT (early PH morning)
                 "minute": 0,
                 "upload": True,
                 "active": True,
