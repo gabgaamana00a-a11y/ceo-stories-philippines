@@ -237,7 +237,7 @@ def build_background_video(output_path: str, target_duration: float, scene_tags:
                 f.write(f"file '{os.path.abspath(p).replace(chr(92), '/')}'\n")
         subprocess.run(
             [ffmpeg, "-y", "-f", "concat", "-safe", "0", "-i", list_file, "-c", "copy", output_path],
-            check=True, capture_output=True, timeout=300,
+            check=True, capture_output=True, timeout=600,
         )
         os.remove(list_file)
         for p in clip_paths:
@@ -803,7 +803,7 @@ def render_chat_video(
             "-t", str(audio_duration), output_path,
         ]
 
-    result2 = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+    result2 = subprocess.run(cmd, capture_output=True, text=True, timeout=1800)
     if result2.returncode != 0:
         raise RuntimeError(f"Final mux failed:\n{result2.stderr[-800:]}")
 
@@ -867,26 +867,43 @@ def render_drama_video(
     ass_path = os.path.join(base, "_subtitles.ass")
     write_ass_subtitles(captions, segments, ass_path)
 
-    # ── 4. Apply warm color grade + subtitle burn-in ─────────────────────────
+    # ── 4. Burn subtitles into video ─────────────────────────────────────────
+    # For long videos (>15 min): skip color grade, use ultrafast preset
+    # For short videos: apply warm color grade + fast preset
     graded = os.path.join(base, "_graded.mp4")
-    # Fonts dir for ASS subtitles on Windows needs proper escaping
+    is_long = audio_duration > 900  # >15 min
+    if is_long:
+        print(f"[render] Long video ({audio_duration/60:.0f} min) — fast preset, no color grade")
+    else:
+        print(f"[render] Short video — color graded")
+
+    # Build subtitle filter string
     ass_escaped = ass_path.replace("\\", "/")
     if os.name == "nt":
         fontsdir = "C\\:/Windows/Fonts"
-        ass_filter = f"ass='{ass_escaped}':fontsdir='{fontsdir}'"
+        sub_filter = f"ass='{ass_escaped}':fontsdir='{fontsdir}'"
     else:
-        ass_filter = f"ass='{ass_escaped}'"
+        sub_filter = f"ass='{ass_escaped}'"
+
+    # Filter chain: optional color grade + subtitle burn-in
+    if is_long:
+        filter_chain = f"[0:v]{sub_filter}"
+        enc_args = ["-c:v", "libx264", "-preset", "ultrafast", "-crf", "26"]
+    else:
+        filter_chain = f"[0:v]eq=contrast=1.12:brightness=0.03:saturation=1.08,{sub_filter}"
+        enc_args = _encode_args()
+
+    # Timeout: 20 min for short, 90 min for long
+    burn_timeout = 5400 if is_long else 1200
+
     subprocess.run([
         ffmpeg, "-y", "-i", bg_video,
-        "-filter_complex", (
-            # Warm color grade + burn in subtitles
-            f"[0:v]eq=contrast=1.12:brightness=0.03:saturation=1.08,{ass_filter}"
-        ),
-        *_encode_args(), "-pix_fmt", "yuv420p",
+        "-filter_complex", filter_chain,
+        *enc_args, "-pix_fmt", "yuv420p",
         "-t", str(audio_duration),
         graded,
-    ], check=True, capture_output=True, timeout=600)
-    print(f"[render] Graded video with subtitles: {graded}")
+    ], check=True, capture_output=True, timeout=burn_timeout)
+    print(f"[render] Subtitles burned: {graded}")
 
     # ── 5. Mux audio + optional background music ──────────────────────────────
     has_music = music_path and os.path.exists(music_path)
@@ -914,7 +931,7 @@ def render_drama_video(
             "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart",
             "-t", str(audio_duration),
             output_path,
-        ], check=True, capture_output=True, timeout=600)
+        ], check=True, capture_output=True, timeout=1800)
 
         # Cleanup intermediates
         for f in [mixed_audio]:
@@ -929,7 +946,7 @@ def render_drama_video(
             "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart",
             "-t", str(audio_duration),
             output_path,
-        ], check=True, capture_output=True, timeout=600)
+        ], check=True, capture_output=True, timeout=1800)
 
     # Cleanup intermediates
     for f in [bg_video, graded, ass_path]:
