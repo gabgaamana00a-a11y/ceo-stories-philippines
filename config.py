@@ -27,20 +27,12 @@ CHANNEL_NICHE = "ceo_success_stories"
 UPLOAD_PRIVACY  = "public"   # public | unlisted | private
 UPLOAD_CATEGORY = "22"       # 22 = People & Blogs
 UPLOAD_TAGS = [
-    # High-volume success/inspiration searches
-    "ceo story", "success story philippines", "rags to riches",
-    "pinoy success story", "negosyo story", "entrepreneur philippines",
-    "ofw success story", "buhay ceo", "yaman story",
-    "inspirational story tagalog", "motivational story philippines",
-    "sipag at tiyaga", "pinoy entrepreneur", "success mindset",
-    # Founder/business terms
-    "ceo philippines", "business story", "startup philippines",
-    "yumaman sa negosyo", "karanasan ng ceo", "tagumpay sa buhay",
-    "mahirap hanggang sa yumaman", "pinoy billionaire story",
-    "small business success", "ofw na naging ceo",
-    # Engagement terms
-    "inspirasyon", "motivation", "tagumpay", "pinoy pride",
-    "ceo stories", "filipino success", "youtube motivational",
+    # YouTube max 500 chars total for tags. Keep short and relevant.
+    "CEO Stories Philippines", "Tagalog success story",
+    "Pinoy CEO", "rags to riches", "OFW success",
+    "inspirational story", "motivational", "entrepreneur",
+    "negosyo", "tagumpay", "pinoy pride",
+    "business story", "startup", "success mindset",
 ]
 
 # ── Video format — 16:9 landscape for YouTube long-form ──────────────────────
