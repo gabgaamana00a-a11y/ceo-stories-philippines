@@ -19,6 +19,7 @@ Usage:
 
 import os
 import sys
+import re
 import csv
 import json
 import time
@@ -110,23 +111,66 @@ _TITLE_PROMPT = """Gumawa ng ISANG high-CTR YouTube title para sa Tagalog CEO su
 KWENTO: {seed}
 
 ANG MGA SIKRETO NG HIGH-CTR FILIPINO TITLE:
-- Magsimula sa isang SHOCKING statement o numero (P1,000, 5 taon, ₱1M)
+- Magsimula sa isang SHOCKING statement, numero, o damdamin (₱500, 5 taon, ₱1M, "Tinanggal", "Nilait")
 - Gumamit ng EMOTIONAL trigger: paghihirap, pagtatraydor, pag-asa, paghihiganti
 - Gumamit ng "MULA SA ___ HANGGANG ___" o "___ → ___" na transition
 - Maglagay ng curiosity gap — huwag isiwalat ang lahat
-- MAXIMUM 70 characters bago ang pipe
+- Palaging may TUKOY na numero o halaga (₱1,000, 5 taon, 100 branches)
 
 MGA HALIMBAWA (pattern — hindi kopyahin):
 - "₱500 Lang ang Puhunan — Ngayon May 50 Branches Na! 😱 | CEO Stories PH"
 - "Tinanggal sa Trabaho — Ngayon Mas Mayaman Pa sa Dating Boss! 💰 | CEO Stories"
 - "Natulog sa Bangketa — Ngayon CEO na ng Sariling Kumpanya! 🏆 | Tagalog Success"
 
-MGA PATAKARAN:
-- 55-85 characters TOTAL
+MGA PATAKARAN (HIGPIT NA SUNDIN):
+- 55-85 characters TOTAL (kasama ang suffix)
 - Tagalog (Filipino) — natural at casual
-- ISANG emoji lamang (💼 💰 🔥 🏆 💪 📈 😱 💎)
+- ISANG emoji lamang (💼 💰 🔥 🏆 💪 📈 😱 💎 👑)
+- Ang pera ay gamitan ng ₱ sign (₱1,000 — HINDI P1,000)
+- BAWAL ang nakakulong na numero tulad ng "(25)" o "(10)"
+- BAWAL ang doble o sobrang space
+- BAWAL sabihing "hindi totoo" o "peke" ang kwento — TOTOONG kwento ito
 - Tapusin sa "| CEO Stories PH" o "| Tagalog Success" o "| CEO Stories"
 - I-OUTPUT LAMANG ANG TITLE — walang quotes, walang iba"""
+
+
+_TITLE_RETRY_HINT = (
+    "\n\nMAHIGPIT NA PAALALA: Hindi pasado ang naunang sagot. Siguraduhing: "
+    "(1) may tiyak na numero o ₱ halaga, (2) may transition na \"Mula ... Hanggang\" o \"→\", "
+    "(3) WALANG nakakulong na numero o doble space, (4) 55-85 characters kasama ang suffix."
+)
+
+
+def _clean_title(raw: str) -> str:
+    """Normalize a raw LLM title into one clean single line."""
+    if not raw:
+        return ""
+    t = raw.replace("```", " ").strip()
+    t = t.split("\n")[0].strip()
+    t = t.strip('"').strip("'").strip()
+    t = re.sub(r"\s+", " ", t)                 # collapse whitespace
+    t = re.sub(r"\bP(\d[\d,]*)", r"₱\1", t)    # P1,000 -> ₱1,000
+    t = re.sub(r"\s*\|", " |", t)               # tidy pipe spacing
+    return t.strip()
+
+
+def _title_is_high_ctr(title: str) -> bool:
+    """Heuristic gate that rejects weak or malformed titles."""
+    t = (title or "").strip()
+    if not (40 <= len(t) <= 95):
+        return False
+    if "(" in t or ")" in t:                     # stray "(25)" / "(10)"
+        return False
+    if "  " in t:                                 # double space
+        return False
+    if "|" not in t:                              # missing brand suffix
+        return False
+    low = t.lower()
+    if any(bad in low for bad in ("di totoo", "hindi totoo", "peke")):
+        return False
+    has_number = any(c.isdigit() for c in t) or "₱" in t
+    has_hook = ("→" in t) or ("mula" in low) or ("hanggang" in low)
+    return has_number or has_hook
 
 
 _DESC_PROMPT = """Gumawa ng YouTube description para sa video na ito.
@@ -291,15 +335,21 @@ def generate_package(seed: str = None, category: str = None,
         print(f"[content_gen]   Script missing speaker tags")
         return None
 
-    # ── 2. Title ─────────────────────────────────────────────────────────────
+    # ── 2. Title (validated high-CTR, retry if weak) ──────────────────────────
     print(f"[content_gen]   Generating title...")
-    title = _call_openrouter(
-        _TITLE_PROMPT.format(seed=seed),
-        max_tokens=120, temperature=1.0,
-    )
+    title = None
+    for attempt in range(3):
+        prompt = _TITLE_PROMPT.format(seed=seed)
+        if attempt:
+            prompt += _TITLE_RETRY_HINT
+        cand = _clean_title(_call_openrouter(prompt, max_tokens=120, temperature=1.0) or "")
+        if cand and _title_is_high_ctr(cand):
+            title = cand
+            break
+        title = title or cand          # keep best effort as fallback
+        time.sleep(1)
     if not title:
         return None
-    title = title.strip().strip('"').strip("'").split("\n")[0].strip()
 
     # ── 3. Description ───────────────────────────────────────────────────────
     print(f"[content_gen]   Generating description...")
@@ -401,6 +451,39 @@ def csv_stats() -> dict:
     }
 
 
+def fix_titles() -> int:
+    """Clean + re-generate any title that fails the high-CTR gate. Returns count fixed."""
+    rows = _load_rows()
+    if not rows:
+        return 0
+    fixed = 0
+    for r in rows:
+        cleaned = _clean_title(r.get("title", ""))
+        if cleaned != r.get("title", ""):
+            r["title"] = cleaned
+        if _title_is_high_ctr(r["title"]):
+            continue
+        print(f"[fix] id={r['id']} WEAK: {r['title'][:70]}")
+        new = None
+        for attempt in range(3):
+            prompt = _TITLE_PROMPT.format(seed=r.get("seed", ""))
+            if attempt:
+                prompt += _TITLE_RETRY_HINT
+            cand = _clean_title(_call_openrouter(prompt, max_tokens=120, temperature=1.0) or "")
+            if cand and _title_is_high_ctr(cand):
+                new = cand
+                break
+        if new:
+            r["title"] = new
+            fixed += 1
+            print(f"[fix] id={r['id']} NEW : {new}")
+        else:
+            print(f"[fix] id={r['id']} -- could not improve")
+        time.sleep(1)
+    _write_rows(rows)
+    return fixed
+
+
 # ── CLI ───────────────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
@@ -408,6 +491,7 @@ if __name__ == "__main__":
     parser.add_argument("--count",   type=int, default=30,   help="Number of packages to generate")
     parser.add_argument("--minutes", type=int, default=10,   help="Target script length in minutes")
     parser.add_argument("--stats",   action="store_true",    help="Show CSV stats only")
+    parser.add_argument("--fix-titles", action="store_true", help="Re-generate weak (non-high-CTR) titles")
     args = parser.parse_args()
 
     if args.stats:
@@ -415,5 +499,8 @@ if __name__ == "__main__":
         print(f"Total:  {s['total']}")
         print(f"Used:   {s['used']}")
         print(f"Unused: {s['unused']}")
+    elif args.fix_titles:
+        n = fix_titles()
+        print(f"Fixed {n} title(s)")
     else:
         generate_batch(count=args.count, minutes=args.minutes)
