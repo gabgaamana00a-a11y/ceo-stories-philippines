@@ -102,7 +102,40 @@ jobs:
           python -c "import json,sys; json.load(open('token.json')); print('token.json OK')"
           python -c "import json,sys; json.load(open('credentials.json')); print('credentials.json OK')"
 
-      # ── 6. Run pipeline ──────────────────────────────────────────────────────
+      # ── 6a. Refill content CSV if running low ────────────────────────────────
+      # The CSV is the single source of truth for title/script/description/CTA.
+      # If fewer than 5 unused rows remain, generate more via OpenRouter.
+      - name: Refill content.csv if low
+        env:
+          OPENROUTER_API_KEY:    ${{ secrets.OPENROUTER_API_KEY }}
+          OPENROUTER_API_KEY_2:  ${{ secrets.OPENROUTER_API_KEY_2 }}
+          OPENROUTER_API_KEY_3:  ${{ secrets.OPENROUTER_API_KEY_3 }}
+          OPENROUTER_API_KEY_4:  ${{ secrets.OPENROUTER_API_KEY_4 }}
+          OPENROUTER_API_KEY_5:  ${{ secrets.OPENROUTER_API_KEY_5 }}
+          OPENROUTER_API_KEY_6:  ${{ secrets.OPENROUTER_API_KEY_6 }}
+          OPENROUTER_API_KEY_7:  ${{ secrets.OPENROUTER_API_KEY_7 }}
+          OPENROUTER_API_KEY_8:  ${{ secrets.OPENROUTER_API_KEY_8 }}
+          OPENROUTER_API_KEY_9:  ${{ secrets.OPENROUTER_API_KEY_9 }}
+          OPENROUTER_API_KEY_10: ${{ secrets.OPENROUTER_API_KEY_10 }}
+        run: |
+          python - <<'EOF'
+          import sys
+          sys.path.insert(0, '.')
+          try:
+              from content_gen import csv_stats, generate_batch
+              s = csv_stats()
+              print(f"CSV stats: total={s['total']} used={s['used']} unused={s['unused']}")
+              if s['unused'] < 5:
+                  to_add = 20 - s['unused']
+                  print(f"Adding {to_add} new packages...")
+                  generate_batch(count=to_add, minutes=10)
+              else:
+                  print("CSV has enough unused rows — skipping generation")
+          except Exception as e:
+              print(f"CSV refill failed (non-fatal): {e}")
+          EOF
+
+      # ── 6. Run pipeline (consumes one CSV row) ───────────────────────────────
       - name: Generate CEO success story video
         env:
           OPENROUTER_API_KEY:    ${{ secrets.OPENROUTER_API_KEY }}
@@ -137,8 +170,8 @@ jobs:
           echo "Running: python main.py $ARGS"
           python main.py $ARGS
 
-      # ── 7. Persist used seed + title lists ──────────────────────────────────────────────
-      - name: Commit used_topics.json and used_titles.json
+      # ── 7. Persist CSV history + used lists ─────────────────────────────────
+      - name: Commit content.csv and history files
         if: always()
         continue-on-error: true
         env:
@@ -147,8 +180,8 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git remote set-url origin https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }}.git
-          git add used_topics.json used_titles.json || true
-          git diff --cached --quiet || git commit -m "chore: update topic/title history [skip ci]"
+          git add content.csv used_topics.json used_titles.json || true
+          git diff --cached --quiet || git commit -m "chore: update content.csv + history [skip ci]"
           git push
 
       # ── 8. Save artifact ─────────────────────────────────────────────────────────────

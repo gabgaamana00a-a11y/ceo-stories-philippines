@@ -17,6 +17,7 @@ Run manually:
 """
 
 import os
+import sys
 import json
 import random
 import re
@@ -24,6 +25,13 @@ from datetime import datetime
 
 from dotenv import load_dotenv
 load_dotenv()
+
+# Windows console is cp1252 by default and crashes on emoji/arrows in titles.
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
 
 from config import (
     CHANNEL_NAME, UPLOAD_TAGS, UPLOAD_PRIVACY, UPLOAD_CATEGORY, SCENE_KEYWORDS
@@ -225,6 +233,49 @@ def _make_description(story_seed: str, title: str) -> str:
         f"📢 I-share sa iyong mga kaibigan na nangangailangan ng inspirasyon\n\n"
         f"{hashtags}"
     )
+
+
+# ── Content CSV (single source of truth) ──────────────────────────────────────
+
+_CSV_FILE = os.path.join(os.path.dirname(__file__), "content.csv")
+_CSV_HEADERS = ["id", "seed", "category", "title", "script", "description", "cta", "used", "created_at"]
+
+
+def _csv_next_unused() -> dict | None:
+    """Return the next unused content package from content.csv, or None."""
+    import csv as _csv
+    if not os.path.exists(_CSV_FILE):
+        return None
+    try:
+        with open(_CSV_FILE, "r", encoding="utf-8", newline="") as f:
+            rows = list(_csv.DictReader(f))
+    except Exception as e:
+        print(f"[csv] read error: {e}")
+        return None
+    for row in rows:
+        if str(row.get("used", "")).lower() != "true":
+            return row
+    return None
+
+
+def _csv_mark_used(row_id: str) -> None:
+    """Mark a CSV row as used=True after successful processing."""
+    import csv as _csv
+    if not os.path.exists(_CSV_FILE):
+        return
+    try:
+        with open(_CSV_FILE, "r", encoding="utf-8", newline="") as f:
+            rows = list(_csv.DictReader(f))
+        for row in rows:
+            if str(row.get("id")) == str(row_id):
+                row["used"] = "true"
+        with open(_CSV_FILE, "w", encoding="utf-8", newline="") as f:
+            w = _csv.DictWriter(f, fieldnames=_CSV_HEADERS)
+            w.writeheader()
+            w.writerows(rows)
+        print(f"[csv] Marked id={row_id} as used")
+    except Exception as e:
+        print(f"[csv] mark-used error: {e}")
 
 
 # ── Music finder ──────────────────────────────────────────────────────────────
@@ -464,15 +515,41 @@ def create_drama_video(
     banner = "=" * 60
     print(f"\n{banner}\n{CHANNEL_NAME} — {timestamp}\n{banner}")
 
-    # ── 1. Story seed ─────────────────────────────────────────────────────────
+    # ── 1. Content source: CSV first, else generate ───────────────────────────
+    csv_row = None
+    title = None
+    description = None
+    cta = None
+
     if not story_seed:
-        print("\n[1/6] Fetching CEO success story seed...")
-        story_seed = get_trending_drama_seed()
-    print(f"  Seed: {story_seed[:85]}...")
+        csv_row = _csv_next_unused()
+
+    if csv_row:
+        story_seed = csv_row.get("seed", "")
+        title       = csv_row.get("title", "").strip()
+        script      = csv_row.get("script", "").strip()
+        description = csv_row.get("description", "").strip()
+        cta         = csv_row.get("cta", "").strip()
+        print(f"\n[1/6] Using content from content.csv (id={csv_row.get('id')})")
+        print(f"  Category: {csv_row.get('category')}")
+        print(f"  Title: {title[:70]}")
+        print(f"  Seed: {story_seed[:70]}...")
+        if not script or len(script.split()) < 200:
+            print("[1/6] CSV script too short — falling back to generation")
+            csv_row = None
+    else:
+        # No CSV row available — generate on the fly
+        if not story_seed:
+            print("\n[1/6] No unused CSV rows — fetching trending seed...")
+            story_seed = get_trending_drama_seed()
+        print(f"  Seed: {story_seed[:85]}...")
 
     # ── 2. Script ─────────────────────────────────────────────────────────────
-    print("\n[2/6] Generating CEO success script...")
-    script = generate_drama_script(story_seed, target_minutes=story_minutes)
+    if csv_row:
+        print("\n[2/6] Script loaded from CSV")
+    else:
+        print("\n[2/6] Generating CEO success script...")
+        script = generate_drama_script(story_seed, target_minutes=story_minutes)
     script_path = os.path.join(output_dir, "script.txt")
     with open(script_path, "w", encoding="utf-8") as f:
         f.write(script)
@@ -499,7 +576,8 @@ def create_drama_video(
 
     # ── 5. Thumbnail ──────────────────────────────────────────────────────────
     print("\n[5/6] Generating success-style thumbnail...")
-    title = _make_title(story_seed)
+    if not title:
+        title = _make_title(story_seed)
     thumb_path = os.path.join(output_dir, "thumbnail.png")
     generate_thumbnail(
         title, thumb_path, video_path, style="drama",
@@ -511,10 +589,20 @@ def create_drama_video(
     url = None
     if upload:
         print("\n[6/6] Uploading to YouTube...")
-        description = _make_description(story_seed, title)
+        if not description:
+            description = _make_description(story_seed, title)
+        # Append CTA to description if present
+        if cta and cta not in description:
+            description = f"{description}\n\n{cta}"
         url = _upload_youtube(video_path, title, description, thumb_path=thumb_path)
+        # Mark CSV row used only after successful upload
+        if csv_row and url:
+            _csv_mark_used(csv_row.get("id"))
     else:
         print("\n[6/6] Upload skipped (--no-upload flag)")
+        # In no-upload mode, still mark used so it isn't retried forever
+        if csv_row:
+            _csv_mark_used(csv_row.get("id"))
 
     result = {
         "story_seed":      story_seed,
