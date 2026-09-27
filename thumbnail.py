@@ -291,18 +291,15 @@ def _ctr_vignette(bg: Image.Image, W: int, H: int) -> Image.Image:
     v = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     d = ImageDraw.Draw(v)
 
-    for i in range(60):
-        t = i / 60
-        a = int(220 * (1 - t) ** 2.2)
-        m = i * 5
-        if W - 2 * m < 2 or H - 2 * m < 2:
-            break
-        d.rectangle([m, m, W - m - 1, H - m - 1], outline=(0, 0, 0, a), width=3)
-
-    for y in range(H - 1, H - 120, -1):
-        t = (H - y) / 120
-        a = int(40 * (1 - t) ** 1.4)
-        d.line([(0, y), (W, y)], fill=(255, 200, 30, a))
+    # Smooth edge darkening — NO drawn frame/border lines.
+    depth = int(min(W, H) * 0.30)
+    for i in range(depth):
+        t = i / depth
+        a = int(200 * (1 - t) ** 2.2)
+        d.line([(0, i), (W, i)], fill=(0, 0, 0, a))
+        d.line([(0, H - 1 - i), (W, H - 1 - i)], fill=(0, 0, 0, a))
+        d.line([(i, 0), (i, H)], fill=(0, 0, 0, a))
+        d.line([(W - 1 - i, 0), (W - 1 - i, H)], fill=(0, 0, 0, a))
 
     return Image.alpha_composite(bg.convert("RGBA"), v).convert("RGB")
 
@@ -337,14 +334,7 @@ def _draw_coin_sparkles(bg: Image.Image, W: int, H: int, rng) -> Image.Image:
 # ── 6. RED urgency elements ──────────────────────────────────────────────────
 
 def _draw_urgency_elements(draw: ImageDraw.Draw, W: int, H: int, rng) -> None:
-    """Red attention-grabbing elements: arrow, circle, emoji."""
-    # Red circle accent near text
-    cx, cy = int(W * 0.38), int(H * 0.62)
-    for r in range(45, 0, -3):
-        a = int(80 * (1 - r / 45))
-        draw.ellipse([cx - r, cy - r, cx + r, cy + r],
-                     outline=(255, 40, 40, a), width=3)
-
+    """Red attention-grabbing elements: arrow, sparkles."""
     # Red arrow pointing right (to subscribe/action area)
     ax, ay = int(W * 0.88), int(H * 0.85)
     for i in range(6):
@@ -375,8 +365,6 @@ def _draw_brand_badge(draw: ImageDraw.Draw) -> None:
     x2, y2 = x1 + tw + pad * 2, y1 + th + pad + 2
 
     draw.rectangle([x1, y1, x2, y2], fill=(0, 0, 30, 200))
-    draw.rectangle([x1, y1, x2, y2], outline=(255, 215, 0), width=4)
-    draw.rectangle([x1, y2 - 2, x2, y2], fill=(255, 40, 40))
     draw.text((x1 + pad, y1 + pad // 2), text, fill=(255, 215, 0), font=font)
 
 
@@ -397,7 +385,6 @@ def _draw_social_proof_badge(bg: Image.Image) -> Image.Image:
 
     # Red badge background
     draw.rounded_rectangle([x1, y1, x2, y2], radius=6, fill=(200, 20, 20))
-    draw.rounded_rectangle([x1, y1, x2, y2], radius=6, outline=(255, 255, 255), width=2)
 
     # Text
     draw.text((x1 + pad, y1 + pad // 2 - 1), text, fill=(255, 255, 255), font=font)
@@ -562,9 +549,6 @@ def _draw_subscribe_bar(draw: ImageDraw.Draw, W: int, H: int) -> None:
     y = H - 60
     draw.rectangle([0, y, W, H], fill=(5, 5, 30))
 
-    # Gold top border
-    draw.rectangle([0, y, W, y + 3], fill=(255, 215, 0))
-
     font = _font("arialbd.ttf", 32)
     text = "🔔 SUBSCRIBE  •  CEO STORIES PHILIPPINES  •  ARAW-ARAW"
     draw.text((W // 2, y + 14), text, fill=(255, 215, 0), font=font, anchor="ma")
@@ -574,8 +558,6 @@ def _draw_subscribe_bar(draw: ImageDraw.Draw, W: int, H: int) -> None:
     bx, by = W - btn_w - 14, y + 11
     draw.rounded_rectangle([bx, by, bx + btn_w, by + btn_h],
                            radius=19, fill=(255, 10, 10))
-    draw.rounded_rectangle([bx, by, bx + btn_w, by + btn_h],
-                           radius=19, outline=(255, 255, 255), width=2)
     bfont = _font("arialbd.ttf", 26)
     draw.text((bx + btn_w // 2, by + btn_h // 2), "SUBSCRIBE",
               fill=(255, 255, 255), font=bfont, anchor="mm")

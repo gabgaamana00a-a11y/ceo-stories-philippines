@@ -265,7 +265,6 @@ def write_ass_subtitles(captions: list, segments: list, ass_path: str) -> str:
       • Semi-transparent dark backdrop behind text for 100% readability
       • Speaker-color-coded text (gold for narrator, warm tones for characters)
       • Smooth fade-in/out animations (250ms fade)
-      • Speaker lower-third labels (top-left, gold accent bar)
       • Word-level karaoke-style timing for professional feel
       • Bold black outline (4px) + shadow (3px) for contrast on any background
     """
@@ -309,10 +308,7 @@ def write_ass_subtitles(captions: list, segments: list, ass_path: str) -> str:
         # MarginV: 50px from bottom (slightly higher so video isn't covered)
         "Style: Caption,Arial Bold,80,&H00FFFFFF,&H000000FF,"
         "&H00000000,&H88000000,-1,0,0,0,100,100,3,0,2,5,4,2,50,50,50,1\n"
-        # ── Label style: speaker name tag top-left ────────────────────────────
-        # Smaller, gold text on dark semi-transparent box
-        "Style: Label,Arial Bold,36,&H0000DCFF,&H000000FF,"
-        "&H00111111,&HBB000000,-1,0,0,0,100,100,1,0,1,2,1,1,20,20,20,1\n"
+
         # ── Sub-label style: secondary info ───────────────────────────────────
         "Style: SubLabel,Arial,28,&H00C0C0C0,&H000000FF,"
         "&H00111111,&H88000000,0,0,0,0,100,100,1,0,1,2,1,1,20,20,18,1\n\n"
@@ -322,16 +318,6 @@ def write_ass_subtitles(captions: list, segments: list, ass_path: str) -> str:
 
     with open(ass_path, "w", encoding="utf-8") as f:
         f.write(header)
-
-        # ── Speaker label lines (layer 0) ────────────────────────────────────
-        # Shows speaker name in top-left with gold accent
-        for seg in segments:
-            label = seg.get("label", seg.get("speaker", ""))
-            start = _ass_time(seg["start"])
-            end   = _ass_time(seg["start"] + seg["duration"])
-            # Fade in/out for smooth transition
-            f.write(f"Dialogue: 0,{start},{end},Label,,0,0,0,,"
-                    f"{{\\fad(200,150)\\c&H00DCFF&}}{label}\n")
 
         # ── Caption lines (layer 1 & 2) — premium styled ─────────────────────
         # Layer 1: background box (solid dark pill behind text)
@@ -915,7 +901,7 @@ def render_drama_video(
             ffmpeg, "-y", "-i", audio_path, "-i", music_path,
             "-filter_complex", (
                 f"[0:a]volume=1.0[speech];"
-                f"[1:a]volume=0.35,"
+                f"[1:a]volume=0.15,"
                 f"afade=t=in:st=0:d=4,afade=t=out:st={fade_out:.1f}:d=4[music];"
                 f"[speech][music]amix=inputs=2:normalize=0:dropout_transition=3[aout]"
             ),
