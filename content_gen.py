@@ -129,6 +129,8 @@ MGA PATAKARAN (HIGPIT NA SUNDIN):
 - Ang pera ay gamitan ng ₱ sign (₱1,000 — HINDI P1,000)
 - BAWAL ang nakakulong na numero tulad ng "(25)" o "(10)"
 - BAWAL ang doble o sobrang space
+- TAMANG spelling at capitalization — i-UPPERCASE ang acronym (RTW, CEO, OFW, DH, IT) — HINDI "Rtw"
+- IWASAN ang maling salita tulad ng "Ngayong" (gamitin: "Ngayon")
 - BAWAL sabihing "hindi totoo" o "peke" ang kwento — TOTOONG kwento ito
 - Tapusin sa "| CEO Stories PH" o "| Tagalog Success" o "| CEO Stories"
 - I-OUTPUT LAMANG ANG TITLE — walang quotes, walang iba"""
